@@ -158,6 +158,7 @@
 		"clearWellKnowns": "Re-fetch .well-known records",
 		"description": "These are for developers of Spacebar/Fermi, if you don't know what you're doing, please don't mess with these settings.",
 		"gatewayComp": "Disable Gateway compression",
+		"reportSystem":"Enable experimental reporting system",
 		"logGateway": "Log received gateway events (log level info):",
 		"name": "Developer Settings",
 		"traces": "Expose traces:"
@@ -246,6 +247,7 @@
 			"owner": "Find the owner",
 			"permission": "Permissions:"
 		},
+		"report":"Report Guild",
 		"admins": "Find Admins",
 		"all": "all",
 		"banReason": "Ban reason: $1",
@@ -469,7 +471,7 @@
 		"oldPassword:": "Old password:",
 		"password:": "Password",
 		"privacyPolcyURL": "Privacy policy URL:",
-		"appID":"Appreciation ID: $1",
+		"appID":"Application ID: $1",
 		"showSecret":"Show Client Secret",
 		"clientSecret":"Client Secret: $1",
 		"secret":"Secret",
@@ -556,6 +558,7 @@
 		"andMore": "$1, and more!",
 		"attached": "Sent an attachment",
 		"delete": "Delete message",
+		"report":"Report message",
 		"deleted": "Deleted message",
 		"edit": "Edit message",
 		"edited": "(edited)",
@@ -567,6 +570,15 @@
 		"reactionsTitle": "Reactions",
 		"retry": "Resend errored message",
 		"viewrest": "View rest"
+	},
+	"report":{
+		"back":"Back",
+		"next":"Next",
+		"cancel":"Cancel",
+		"submit":"Submit",
+		"blockUser":"Block user",
+		"timeout":"Timeout Member",
+		"summary":"Report Summary:"
 	},
 	"messageLink": "Message in # $1",
 	"muteDuration": "Unmute in:",
@@ -798,6 +810,8 @@
 	"useTemplateButton": "Use Template",
 	"usedFermi": "Used Fermi",
 	"user": {
+		"report":"Report user",
+		"reportApp":"Report Application",
 		"addRole": "Add roles",
 		"ban": "Ban member",
 		"block": "Block user",

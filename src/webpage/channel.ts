@@ -46,7 +46,22 @@ class Channel extends SnowFlake {
 	topic!: string;
 	nsfw!: boolean;
 	position: number = 0;
-	lastreadmessageid?: string;
+	private lastreadmessageidint?: string;
+	get lastreadmessageid() {
+		return this.lastreadmessageidint;
+	}
+	set lastreadmessageid(id: string | undefined) {
+		const cur = this.lastreadmessageidint;
+		this.lastreadmessageidint = id;
+		const m = this.messages.get(this.idToPrev.get(cur as string) as string);
+		if (m) {
+			m.generateMessage();
+		}
+		const m2 = this.messages.get(this.idToPrev.get(id as string) as string);
+		if (m2) {
+			m2.generateMessage();
+		}
+	}
 	lastmessageid?: string;
 	trueLastMessageid?: string;
 	rate_limit_per_user: number = 0;
@@ -1246,11 +1261,9 @@ class Channel extends SnowFlake {
 		for (let i = 0; i <= 50; i++) {
 			if (!m1) {
 				waits.push(this.grabBefore(id));
-				console.log("hi!!!");
 				break;
 			}
 			if ((this.idToNext.has(m1) && !this.idToNext.get(m1)) || this.lastmessage?.id === m1) break;
-			console.log(this.idToNext.has(m1), this.idToNext.get(m1));
 			m1 = this.idToNext.get(m1);
 		}
 		m1 = m.id;
@@ -1281,9 +1294,8 @@ class Channel extends SnowFlake {
 		}
 
 		try {
-			await this.infinite.focus(id);
+			await this.infinite.focus(id, flash, true);
 		} catch {}
-		this.infinite.focus(id, flash, true);
 	}
 	editLast() {
 		let message: Message | undefined = this.lastmessage;
@@ -2891,6 +2903,10 @@ class Channel extends SnowFlake {
 		}
 		this.setLastMessageId(messagez.id);
 
+		if (this.infinite.atBottom()) {
+			this.lastreadmessageid = messagez.id;
+		}
+
 		this.unreads();
 		this.guild.unreads();
 		if (this === this.localuser.channelfocus) {
@@ -2903,7 +2919,6 @@ class Channel extends SnowFlake {
 		if (messagez.author === this.localuser.user) {
 			this.lastSentMessage = messagez;
 			this.slowmode();
-			this.lastreadmessageid = messagez.id;
 			this.mentions = 0;
 			this.unreads();
 			this.guild.unreads();

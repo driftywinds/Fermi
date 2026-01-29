@@ -34,15 +34,29 @@ function fragAppend(div: HTMLElement, pre = false) {
 		}
 	}
 	const frag = document.createDocumentFragment();
+	let count = 0;
 	return (elm: HTMLElement) =>
 		new Promise<void>((res) => {
+			count++;
 			frag[pre ? "prepend" : "append"](elm);
 			if (!qued) {
-				setTimeout(() => {
-					appendFrag();
-					qued = false;
-					res();
-				});
+				let lcount = count;
+				function wait(t = 0) {
+					if (count !== lcount) {
+						lcount = count;
+						t = 0;
+					}
+					if (t === 10) {
+						appendFrag();
+						qued = false;
+						res();
+						return;
+					}
+					queueMicrotask(() => {
+						wait(t + 1);
+					});
+				}
+				wait();
 				qued = true;
 			} else {
 				res();
@@ -168,20 +182,23 @@ class InfiniteScroller {
 		snap();
 	}
 
-	snapBottom(): () => void {
-		const nothing = () => {};
+	atBottom() {
 		const scroll = this.scroller;
-		if (!scroll) return nothing;
+		if (!scroll) return false;
 		const last = this.weakElmId.get(Array.from(scroll.children).at(-1) as HTMLElement);
-		if (!last) return nothing;
-		if (this.backElm.get(last) || !this.backElm.has(last)) return nothing;
-		if (this.div) {
+		if (!last) return false;
+		if (this.backElm.get(last) || !this.backElm.has(last)) return false;
+		return this.scrollBottom < 4;
+	}
+
+	snapBottom(): () => void {
+		if (this.div && this.atBottom()) {
 			const trigger = this.scrollBottom < 4;
 			return () => {
 				if (this.div && trigger) this.div.scrollTop = this.div.scrollHeight;
 			};
 		} else {
-			return nothing;
+			return () => {};
 		}
 	}
 

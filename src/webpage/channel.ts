@@ -16,6 +16,8 @@ import {
 	mute_config,
 	readyjson,
 	startTypingjson,
+	threadMember,
+	threadMetadata,
 } from "./jsontypes.js";
 import {MarkDown} from "./markdown.js";
 import {Member} from "./member.js";
@@ -79,7 +81,7 @@ class Channel extends SnowFlake {
 	messages: Map<string, Message>;
 	voice?: Voice;
 	bitrate: number = 128000;
-
+	threadData?: threadMetadata;
 	mute_config: mute_config | null = {selected_time_window: -1, end_time: 0};
 	setLastMessageId(id: string) {
 		this.lastmessageid = id;
@@ -117,6 +119,35 @@ class Channel extends SnowFlake {
 					return this.hasPermission("CREATE_INSTANT_INVITE") && this.type !== 4;
 				},
 				color: "blue",
+			},
+		);
+		this.contextmenu.addSeperator();
+		this.contextmenu.addButton(
+			() => I18n.threads.leave(),
+			function () {
+				fetch(this.info.api + "/channels/" + this.id + "/thread-members/@me", {
+					method: "DELETE",
+					headers: this.headers,
+				});
+			},
+			{
+				visible: function () {
+					return !!this.member;
+				},
+			},
+		);
+		this.contextmenu.addButton(
+			() => I18n.threads.join(),
+			function () {
+				fetch(this.info.api + "/channels/" + this.id + "/thread-members/@me", {
+					method: "POST",
+					headers: this.headers,
+				});
+			},
+			{
+				visible: function () {
+					return !this.member;
+				},
 			},
 		);
 		this.contextmenu.addSeperator();
@@ -501,6 +532,12 @@ class Channel extends SnowFlake {
 		);
 	}
 	last_pin_timestamp?: string;
+	member?: threadMember;
+
+	memberCount?: number;
+	messageCount?: number;
+	totalMessageSent?: number;
+
 	constructor(json: channeljson | -1, owner: Guild, id: string = json === -1 ? "" : json.id) {
 		super(id);
 		this.idToNext = owner.localuser.idToNext;
@@ -513,6 +550,11 @@ class Channel extends SnowFlake {
 		if (json === -1) {
 			return;
 		}
+		this.memberCount = json.member_count;
+		this.messageCount = json.message_count;
+		this.totalMessageSent = json.total_message_sent;
+		this.owner_id = json.owner_id;
+		this.member = json.member;
 		this.rate_limit_per_user = json.rate_limit_per_user || 0;
 		this.editing;
 		this.type = json.type;
@@ -527,7 +569,7 @@ class Channel extends SnowFlake {
 		this.guild_id = json.guild_id;
 		this.permission_overwrites = new Map();
 		this.permission_overwritesar = [];
-		for (const thing of json.permission_overwrites) {
+		for (const thing of json.permission_overwrites || []) {
 			if (!this.permission_overwrites.has(thing.id)) {
 				//either a bug in the server requires this, or the API is cursed
 				this.permission_overwrites.set(thing.id, new Permissions(thing.allow, thing.deny));
@@ -560,6 +602,12 @@ class Channel extends SnowFlake {
 		}
 		this.setUpInfiniteScroller();
 		this.perminfo ??= {};
+		this.threadData = json.thread_metadata;
+		const read = this.localuser.unknownRead.get(this.id);
+		if (read) {
+			this.readStateInfo(read);
+			this.localuser.unknownRead.delete(this.id);
+		}
 	}
 	get perminfo() {
 		return this.guild.perminfo.channels[this.id];
@@ -714,7 +762,7 @@ class Channel extends SnowFlake {
 			return a.position - b.position;
 		});
 	}
-	resolveparent(_guild: Guild) {
+	resolveparent(_guild: Guild = this.owner) {
 		const parentid = this.parent_id;
 		if (!parentid) return false;
 		this.parent = this.localuser.channelids.get(parentid);
@@ -754,7 +802,7 @@ class Channel extends SnowFlake {
 		return [build, position] as const;
 	}
 	static dragged: [Channel, HTMLDivElement] | [] = [];
-	html: WeakRef<HTMLElement> | undefined;
+	html: WeakRef<HTMLDivElement> | undefined;
 	get visible() {
 		return this.hasPermission("VIEW_CHANNEL");
 	}
@@ -808,8 +856,12 @@ class Channel extends SnowFlake {
 		}
 		return icon;
 	}
+	isThread() {
+		return this.type === 10 || this.type === 11 || this.type === 12;
+	}
 	createguildHTML(admin = false): HTMLDivElement {
-		const div = document.createElement("div");
+		const div = this.html?.deref() || document.createElement("div");
+		div.innerHTML = "";
 
 		if (this.muted) {
 			div.classList.add("muted");
@@ -820,6 +872,7 @@ class Channel extends SnowFlake {
 				Math.min((this.mute_config?.end_time as number) - Date.now(), 2147483647),
 			);
 		}
+
 		this.html = new WeakRef(div);
 		if (!this.visible) {
 			let quit = true;
@@ -832,7 +885,7 @@ class Channel extends SnowFlake {
 				return div;
 			}
 		}
-		div.draggable = admin;
+		div.draggable = admin && !this.isThread();
 		div.addEventListener("dragstart", (e) => {
 			Channel.dragged = [this, div];
 			e.stopImmediatePropagation();
@@ -840,6 +893,12 @@ class Channel extends SnowFlake {
 		div.addEventListener("dragend", () => {
 			Channel.dragged = [];
 		});
+		const childrendiv = document.createElement("div");
+		childrendiv.classList.add("channels");
+		for (const channel of this.children.filter((_) => !_.isThread() || _.threadVis())) {
+			childrendiv.appendChild(channel.createguildHTML(admin));
+		}
+
 		if (this.type === 4) {
 			this.sortchildren();
 			const caps = document.createElement("div");
@@ -855,7 +914,7 @@ class Channel extends SnowFlake {
 			this.nameSpan = new WeakRef(myhtml);
 			decdiv.appendChild(myhtml);
 			caps.appendChild(decdiv);
-			const childrendiv = document.createElement("div");
+
 			if (admin) {
 				const addchannel = document.createElement("span");
 				addchannel.classList.add("addchannel", "svgicon", "svg-plus");
@@ -872,16 +931,12 @@ class Channel extends SnowFlake {
 
 			Channel.contextmenu.bindContextmenu(decdiv, this, undefined);
 
-			for (const channel of this.children) {
-				childrendiv.appendChild(channel.createguildHTML(admin));
-			}
-			childrendiv.classList.add("channels");
 			setTimeout((_: any) => {
 				if (!this.perminfo.collapsed) {
 					childrendiv.style.height = childrendiv.scrollHeight + "px";
 				}
 			}, 100);
-			div.appendChild(childrendiv);
+
 			if (this.perminfo.collapsed) {
 				decoration.classList.add("hiddencat");
 				childrendiv.style.height = "0px";
@@ -909,10 +964,11 @@ class Channel extends SnowFlake {
 				handleColapse();
 			};
 		} else {
+			childrendiv.classList.add("threads");
 			div.classList.add("channel");
 			this.unreads();
 			Channel.contextmenu.bindContextmenu(div, this, undefined);
-			if (admin) {
+			if (admin && !this.isThread()) {
 				this.coatDropDiv(div);
 			}
 			const button = document.createElement("button");
@@ -938,7 +994,17 @@ class Channel extends SnowFlake {
 				this.updateVoiceUsers();
 			}
 		}
+		div.appendChild(childrendiv);
 		return div;
+	}
+	owner_id?: string;
+	threadVis() {
+		return (
+			(this.member ||
+				this.localuser.channelfocus === this ||
+				this.owner_id === this.localuser.user.id) &&
+			!this.threadData?.archived
+		);
 	}
 	async moveForDrag(x: number) {
 		const mainarea = document.getElementById("mainarea");
@@ -1822,8 +1888,15 @@ class Channel extends SnowFlake {
 			this.myhtml.classList.add("viewChannel");
 		}
 		const id = ++Channel.genid;
+
 		if (this.localuser.channelfocus && this.localuser.channelfocus !== this) {
 			this.localuser.channelfocus.infinite.delete();
+
+			if (this.localuser.channelfocus.isThread() && !this.localuser.channelfocus.member) {
+				const prev = this.localuser.channelfocus;
+				this.localuser.channelfocus = this;
+				prev.parent?.createguildHTML();
+			}
 		} else if (this.localuser.channelfocus === this && !aroundMessage) {
 			if (this.lastmessageid)
 				this.infinite.focus(aroundMessage || this.lastmessageid, !!aroundMessage, true);
@@ -1832,6 +1905,13 @@ class Channel extends SnowFlake {
 		this.guild.prevchannel = this;
 		this.guild.perminfo.prevchannel = this.id;
 		this.localuser.channelfocus = this;
+
+		if (this.isThread() && !this.member) {
+			this.parent?.createguildHTML();
+			if (this.myhtml) {
+				this.myhtml.classList.add("viewChannel");
+			}
+		}
 
 		if (
 			this.nsfw && //@ts-ignore another hack
@@ -2304,8 +2384,10 @@ class Channel extends SnowFlake {
 		console.trace("trace me");
 		this.type = json.type;
 		this.name = json.name;
+		this.owner_id = json.owner_id;
 		this.icon = json.icon;
 		this.renderIcon();
+		this.threadData = json.thread_metadata;
 		this.rate_limit_per_user = json.rate_limit_per_user || 0;
 		this.slowmode();
 
@@ -2320,7 +2402,6 @@ class Channel extends SnowFlake {
 			this.parent_id = undefined;
 		}
 
-		this.children = [];
 		this.guild_id = json.guild_id;
 		const oldover = this.permission_overwrites;
 		this.permission_overwrites = new Map();
@@ -2869,6 +2950,8 @@ class Channel extends SnowFlake {
 		if (this.lastmessageid) await this.focus(this.lastmessageid, false);
 	}
 	async messageCreate(messagep: messageCreateJson): Promise<void> {
+		if (this.totalMessageSent !== undefined) this.totalMessageSent++;
+		if (this.messageCount !== undefined) this.messageCount++;
 		if (!this.hasPermission("VIEW_CHANNEL")) {
 			return;
 		}

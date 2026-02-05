@@ -38,8 +38,12 @@ export function getBulkUsers() {
 	const json = getBulkInfo();
 	apiDoms.clear();
 	for (const thing in json.users) {
-		const user = (json.users[thing] = new Specialuser(json.users[thing]));
-		apiDoms.add(new URL(user.serverurls.api).host);
+		try {
+			const user = (json.users[thing] = new Specialuser(json.users[thing]));
+			apiDoms.add(new URL(user.serverurls.api).host);
+		} catch {
+			delete json.users[thing];
+		}
 	}
 	if (getDeveloperSettings().interceptApiTraces) {
 		SW.postMessage({
@@ -105,6 +109,7 @@ export class Specialuser {
 		if (json instanceof Specialuser) {
 			console.error("specialuser can't construct from another specialuser");
 		}
+		if (!json.serverurls) throw new Error("nope");
 		this.serverurls = json.serverurls;
 		let apistring = new URL(json.serverurls.api).toString();
 		apistring = apistring.replace(/\/(v\d+\/?)?$/, "") + "/v9";

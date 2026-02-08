@@ -1382,6 +1382,7 @@ class Guild extends SnowFlake {
 			}
 		}
 		for (const thread of json.threads) {
+			if (this.localuser.channelids.has(thread.id)) continue;
 			const temp = new Channel(thread, this);
 			this.localuser.channelids.set(temp.id, temp);
 			temp.resolveparent(this);
@@ -1491,7 +1492,7 @@ class Guild extends SnowFlake {
 				build.push(thisthing);
 			}
 			position++;
-			if (thing.children.length > 0) {
+			if (thing.children.length > 0 && thing.type === 4) {
 				let things: buildtype;
 				[things, position] = thing.calculateReorder(position);
 				for (const thing of things) {
@@ -1662,7 +1663,7 @@ class Guild extends SnowFlake {
 		let read = true;
 		let mentions = this.mentions;
 		for (const thing of this.channels) {
-			if (thing.hasunreads) {
+			if (thing.hasunreads && (!thing.isThread() || thing.owner)) {
 				read = false;
 				break;
 			}
@@ -1873,7 +1874,9 @@ class Guild extends SnowFlake {
 		}
 	}
 	createchannels(func = this.createChannel.bind(this)) {
-		const options = (["text", "announcement", "voice"] as const).map((e) => I18n.channel[e]());
+		const options = (["text", "announcement", "voice", "forum"] as const).map((e) =>
+			I18n.channel[e](),
+		);
 
 		const channelselect = new Dialog("");
 		const form = channelselect.options.addForm("", (e: any) => {
@@ -1881,7 +1884,7 @@ class Guild extends SnowFlake {
 			channelselect.hide();
 		});
 
-		form.addSelect(I18n.channel.selectType(), "type", options, {radio: true}, [0, 5, 2]);
+		form.addSelect(I18n.channel.selectType(), "type", options, {radio: true}, [0, 5, 2, 15]);
 		form.addTextInput(I18n.channel.selectName(), "name");
 		channelselect.show();
 	}

@@ -285,6 +285,7 @@
 	},
 	"guild": {
 		"COMMUNITY": "Apply to join",
+		"disableInvites":"Disable Invites:",
 		"DISCOVERABLE": "Discovery",
 		"INVITES_DISABLED": "Invite only",
 		"adminMenu": {
@@ -612,7 +613,7 @@
 		"edited": "(edited)",
 		"fullMessage": "Full message:",
 		"pin": "$1 has pinned a message",
-		"pin": "$1 has created a thread: $2",
+		"thread": "$1 has created a thread: $2",
 		"reactedWith": "Reacted with $1",
 		"reactionAdd": "Add reaction",
 		"createThread":"Create Thread",

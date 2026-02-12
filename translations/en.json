@@ -26,6 +26,8 @@
 		"markRead": "Mark as read",
 		"name": "Direct Messages"
 	},
+	"ok":"Ok",
+	"dismiss":"Dismiss",
 	"UrlGen": "URL generator",
 	"Voice": {
 		"status": {
@@ -53,7 +55,8 @@
 		"name": "Accessibility",
 		"playGif": "Play gifs on:",
 		"playIcon": "Play animated icons on:",
-		"roleColors": "Disable role colors"
+		"roleColors": "Disable role colors",
+		"gradientColors":"Disable gradient colors"
 	},
 	"accountNotStart": "Account unable to start",
 	"add": "Add",

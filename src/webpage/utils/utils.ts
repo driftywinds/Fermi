@@ -30,9 +30,10 @@ let instances:
 	  }[]
 	| null = null;
 await setTheme();
-export async function setTheme() {
+export async function setTheme(theme?: string) {
 	const prefs = await getPreferences();
-	document.body.className = prefs.theme + "-theme";
+	document.body.className = (theme || prefs.theme) + "-theme";
+	console.log(theme);
 }
 export function getBulkUsers() {
 	const json = getBulkInfo();
@@ -723,26 +724,29 @@ export function createImg(
 	elm: HTMLElement | void,
 	type: "gif" | "icon" = "gif",
 ): safeImg {
-	const settings =
-		localStorage.getItem(type === "gif" ? "gifSetting" : "iconSetting") ||
-		("hover" as "hover") ||
-		"always" ||
-		"never";
+	const aniOpt = getPreferences().then((prefs) => {
+		return (
+			(type === "gif" ? prefs.animateGifs : prefs.animateIcons) ||
+			("hover" as "hover") ||
+			"always" ||
+			"never"
+		);
+	});
 	const img = document.createElement("img");
 	img.addEventListener("error", () => {
 		img.classList.add("error");
 	});
 	elm ||= img;
 	if (src) {
-		isAnimated(src).then((animated) => {
+		isAnimated(src).then(async (animated) => {
 			if (animated) {
 				img.crossOrigin = "anonymous";
 			}
-			img.src = settings !== "always" ? staticsrc || src || "" : src || "";
+			img.src = (await aniOpt) !== "always" ? staticsrc || src || "" : src || "";
 		});
 	}
 	img.onload = async () => {
-		if (settings === "always") return;
+		if ((await aniOpt) === "always") return;
 		if (!src) return;
 		if ((await isAnimated(src)) && !staticsrc) {
 			let s = staticImgMap.get(src);
@@ -765,14 +769,14 @@ export function createImg(
 			img.src = staticsrc;
 		}
 	};
-	elm.onmouseover = () => {
-		if (settings === "never") return;
+	elm.onmouseover = async () => {
+		if ((await aniOpt) === "never") return;
 		if (img.src !== src && src) {
 			img.src = src;
 		}
 	};
-	elm.onmouseleave = () => {
-		if (staticsrc && settings !== "always") {
+	elm.onmouseleave = async () => {
+		if (staticsrc && (await aniOpt) !== "always") {
 			img.src = staticsrc;
 		}
 	};

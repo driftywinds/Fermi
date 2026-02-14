@@ -58,11 +58,12 @@ class Channel extends SnowFlake {
 	set lastreadmessageid(id: string | undefined) {
 		const cur = this.lastreadmessageidint;
 		this.lastreadmessageidint = id;
-		const m = this.messages.get(this.idToPrev.get(cur as string) as string);
+		const m = this.messages.get(this.idToNext.get(cur as string) as string);
 		if (m) {
+			console.log(m);
 			m.generateMessage();
 		}
-		const m2 = this.messages.get(this.idToPrev.get(id as string) as string);
+		const m2 = this.messages.get(this.idToNext.get(id as string) as string);
 		if (m2) {
 			m2.generateMessage();
 		}
@@ -1268,6 +1269,7 @@ class Channel extends SnowFlake {
 		if (next) {
 			next.generateMessage();
 		}
+		this.infinite.toBottom();
 	}
 	static lastDragDiv = document.createElement("div");
 	coatDropDiv(div: HTMLDivElement, container: HTMLElement | false = false) {
@@ -3364,6 +3366,7 @@ class Channel extends SnowFlake {
 				await this.tryfocusinfinate();
 			}
 			await this.infinite.addedBottom();
+			this.focus(m.id, false);
 		}
 
 		return {
@@ -3392,6 +3395,41 @@ class Channel extends SnowFlake {
 				html.remove();
 			},
 		};
+	}
+	async uploadFile(files: globalThis.File[]) {
+		const urls = (await (
+			await fetch(this.info.api + "/channels/" + this.id + "/attachments", {
+				headers: this.headers,
+				body: JSON.stringify({
+					files: files.map((file, index) => {
+						return {
+							file_size: file.size,
+							filename: file.name,
+							id: index + "",
+						};
+					}),
+				}),
+				method: "POST",
+			})
+		).json()) as {
+			attachments: {
+				id: string;
+				upload_url: string;
+				upload_filename: string;
+				original_content_type?: string;
+			}[];
+		};
+		Promise.all(
+			urls.attachments.map(async ({upload_url, id}) => {
+				return await (
+					await fetch(upload_url, {
+						body: files[+id],
+						method: "PUT",
+					})
+				).json();
+			}),
+		);
+		return urls.attachments;
 	}
 	nonces = new Set<string>();
 	lastSentMessage?: Message;

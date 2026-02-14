@@ -120,6 +120,20 @@ class InfiniteScroller {
 				height = nh;
 			}).observe(root);
 		}
+		const heights = new WeakMap<Element, number>();
+		const re =
+			"ResizeObserver" in globalThis
+				? new ResizeObserver((e) => {
+						for (const elm of e) {
+							const nh = elm.target.getBoundingClientRect().height;
+							const height = heights.get(elm.target);
+							if (height && nh) {
+								if (!this.atBottom()) root.scrollTop -= height - nh;
+							}
+							heights.set(elm.target, nh);
+						}
+					})
+				: undefined;
 		//TODO maybe a workarround?
 		const visable = new Set<Element>();
 		this.observer = new IntersectionObserver(
@@ -128,8 +142,10 @@ class InfiniteScroller {
 					if (obv.target instanceof HTMLElement) {
 						if (obv.isIntersecting) {
 							visable.add(obv.target);
+							re?.observe(obv.target);
 						} else {
 							visable.delete(obv.target);
+							re?.unobserve(obv.target);
 						}
 
 						this.heightMap.set(obv.target, obv.boundingClientRect.height);
@@ -217,12 +233,15 @@ class InfiniteScroller {
 		if (this.backElm.get(last) || !this.backElm.has(last)) return false;
 		return this.scrollBottom < 4;
 	}
+	toBottom() {
+		if (this.div) this.div.scrollTop = this.div.scrollHeight;
+	}
 
 	snapBottom(): () => void {
 		if (this.div && this.atBottom()) {
 			const trigger = this.scrollBottom < 4;
 			return () => {
-				if (this.div && trigger) this.div.scrollTop = this.div.scrollHeight;
+				if (this.div && trigger) this.toBottom();
 			};
 		} else {
 			return () => {};
@@ -400,7 +419,19 @@ class InfiniteScroller {
 			res();
 		});
 		this.filling = fill;
-		return fill;
+		await fill;
+
+		(async () => {
+			while (true) {
+				if (this.div && this.div.parentElement) {
+					if (this.div.parentElement.clientHeight !== this.div.clientHeight) this.reachesBottom();
+					break;
+				}
+				await new Promise((res) => setTimeout(res, 100));
+			}
+		})();
+
+		return;
 	}
 
 	async focus(id: string, flash = true, sec = false): Promise<void> {
@@ -416,7 +447,7 @@ class InfiniteScroller {
 		if (!div) {
 			await this.clearElms();
 			had = false;
-			const obj = await this.getFromID(id);
+			const obj = this.getFromID(id);
 			scroller.append(obj);
 			div = obj;
 		}

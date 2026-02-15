@@ -1269,6 +1269,7 @@ class Localuser {
 			const counts = new Map<string, number>();
 			for (const thing of list.d.ops[0].items) {
 				if ("member" in thing) {
+					if (this.userMap.get(thing.member.id)?.members.has(guild)) continue;
 					await Member.new(thing.member, guild);
 				} else {
 					counts.set(thing.group.id, thing.group.count);
@@ -2137,10 +2138,10 @@ class Localuser {
 				full.hide();
 				if ("template" in e) delete e.template;
 				let code: string;
-				if (URL.canParse(template.value)) {
+				if (URL.canParse(template.value) && new URL(template.value).protocol.startsWith("http")) {
 					const url = new URL(template.value);
 					code = url.pathname.split("/").at(-1) as string;
-					if (url.host === "discord.com") {
+					if (url.host === "discord.com" || url.host === "discord.new") {
 						code = "discord:" + code;
 					}
 				} else {
@@ -3988,13 +3989,13 @@ class Localuser {
 		if (empty) {
 			raw = "";
 		}
-		raw = (start ? original.replace(start, "") : original) + replacewith + raw;
+		raw = (start ? original.replace(start, "") : original) + " " + replacewith + raw;
 
 		typebox.txt = raw.split("");
 		const match = start ? original.match(start) : true;
 		if (match) {
 			typebox.boxupdate(
-				replacewith.length - (match === true ? 0 : match[0].length),
+				replacewith.length - (match === true ? 0 : match[0].length) + 1,
 				false,
 				original.length,
 			);

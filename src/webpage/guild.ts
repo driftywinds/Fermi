@@ -1659,7 +1659,8 @@ class Guild extends SnowFlake {
 	get mentions() {
 		let mentions = 0;
 		for (const thing of this.channels) {
-			mentions += thing.mentions;
+			if (thing.visible) mentions += thing.mentions;
+			else if (thing.mentions) console.error("Hidden Channel has pings:", thing);
 		}
 		return mentions;
 	}

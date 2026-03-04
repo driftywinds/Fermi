@@ -35,6 +35,7 @@ import {Direct} from "./direct.js";
 import {NotificationHandler} from "./notificationHandler.js";
 import {Command} from "./interactions/commands.js";
 import {Tag} from "./tag.js";
+import {CDNParams} from "./utils/cdnParams.js";
 
 class Channel extends SnowFlake {
 	editing!: Message | null;
@@ -329,7 +330,10 @@ class Channel extends SnowFlake {
 	}
 	icon?: string;
 	iconUrl() {
-		return `${this.info.cdn}/channel-icons/${this.id}/${this.icon}.png`;
+		return (
+			`${this.info.cdn}/channel-icons/${this.id}/${this.icon}.png` +
+			new CDNParams({expectedSize: 32})
+		);
 	}
 	createInvite() {
 		const div = document.createElement("div");
@@ -853,10 +857,8 @@ class Channel extends SnowFlake {
 			}
 		}
 		const roles = new Set(member.roles);
-		const everyone = this.guild.roles[this.guild.roles.length - 1];
-		if (!member.user.bot || true) {
-			roles.add(everyone);
-		}
+		const everyone = this.guild.roleids.get(this.guild.id);
+		if (everyone) roles.add(everyone);
 
 		const premission = this.permission_overwrites.get(member.id);
 		if (premission) {
@@ -874,6 +876,8 @@ class Channel extends SnowFlake {
 					return perm === 1;
 				}
 			}
+		}
+		for (const thing of roles) {
 			if (thing.permissions.getPermission(name)) {
 				return true;
 			}

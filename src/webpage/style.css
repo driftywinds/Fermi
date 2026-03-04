@@ -3282,7 +3282,6 @@ img.bigembedimg {
 	background: var(--primary-bg);
 }
 .banner {
-	background: yellow;
 	height: 100px;
 	width: 100%;
 	object-fit: cover;
@@ -4908,4 +4907,9 @@ img.error::after {
 		color: var(--link);
 		margin-left: auto;
 	}
+}
+.embedImg {
+	max-width: 400px;
+	max-height: 400px;
+	border-radius: 3px;
 }

@@ -232,6 +232,7 @@ class Localuser {
 		this.userinfo = userinfo;
 		this.perminfo.guilds ??= {};
 		this.perminfo.user ??= {};
+		this.perminfo.user.decorations ??= true;
 		this.serverurls = this.userinfo.serverurls;
 		this.initialized = false;
 		this.info = this.serverurls;
@@ -845,6 +846,7 @@ class Localuser {
 							document.getElementById("bottomseparator"),
 						);
 						guildy.message_notifications = guildy.properties.default_message_notifications;
+						guildy.showWelcome();
 					})();
 					break;
 				case "MESSAGE_REACTION_ADD":
@@ -1063,12 +1065,24 @@ class Localuser {
 		} else if (temp.op === 11) {
 			setTimeout((_: any) => {
 				if (!this.ws) return;
+				const reasons = this.generateReasons();
+
 				if (this.connectionSucceed === 0) this.connectionSucceed = Date.now();
-				this.ws.send(JSON.stringify({op: 1, d: this.lastSequence}));
+				this.ws.send(
+					JSON.stringify({
+						op: 40,
+						d: {seq: this.lastSequence, qos: {ver: 27, active: !!reasons.length, reasons}},
+					}),
+				);
 			}, this.heartbeat_interval);
 		} else {
 			console.log("Unhandled case " + temp.d, temp);
 		}
+	}
+	generateReasons() {
+		const reasons: string[] = [];
+		if (!document.hidden) reasons.push("foregrounded");
+		return reasons;
 	}
 	get currentVoice() {
 		return this.voiceFactory?.currentVoice;
@@ -2887,6 +2901,14 @@ class Localuser {
 					this.perminfo.user.disableIcons = !t;
 				},
 				{initState: !this.perminfo.user.disableIcons},
+			);
+
+			accessibility.addCheckboxInput(
+				I18n.accessibility.decorations(),
+				(t) => {
+					this.perminfo.user.decorations = t;
+				},
+				{initState: this.perminfo.user.decorations},
 			);
 			accessibility.addSelect(
 				I18n.accessibility.playGif(),

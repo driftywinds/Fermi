@@ -2716,9 +2716,20 @@ class Channel extends SnowFlake {
 		(document.getElementById("upload") as HTMLElement).style.visibility = this.canMessage
 			? "visible"
 			: "hidden";
+		(document.getElementById("gifTB") as HTMLElement).style.visibility = this.canMessage
+			? "visible"
+			: "hidden";
+		(document.getElementById("stickerTB") as HTMLElement).style.visibility = this.canMessage
+			? "visible"
+			: "hidden";
+		(document.getElementById("emojiTB") as HTMLElement).style.visibility = this.canMessage
+			? "visible"
+			: "hidden";
 		(document.getElementById("typediv") as HTMLElement).style.visibility = "visible";
 		if (!mobile) {
 			(document.getElementById("typebox") as HTMLDivElement).focus();
+		} else {
+			(document.getElementById("typebox") as HTMLDivElement).blur();
 		}
 		if (getMessages) await this.putmessages();
 		await prom;

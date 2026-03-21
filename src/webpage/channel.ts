@@ -2716,15 +2716,18 @@ class Channel extends SnowFlake {
 		(document.getElementById("upload") as HTMLElement).style.visibility = this.canMessage
 			? "visible"
 			: "hidden";
-		(document.getElementById("gifTB") as HTMLElement).style.visibility = this.canMessage
-			? "visible"
-			: "hidden";
-		(document.getElementById("stickerTB") as HTMLElement).style.visibility = this.canMessage
-			? "visible"
-			: "hidden";
-		(document.getElementById("emojiTB") as HTMLElement).style.visibility = this.canMessage
-			? "visible"
-			: "hidden";
+		(document.getElementById("gifTB") as HTMLElement).style.display = this.canMessage
+			? "block"
+			: "none";
+		(document.getElementById("stickerTB") as HTMLElement).style.display = this.canMessage
+			? "block"
+			: "none";
+		(document.getElementById("emojiTB") as HTMLElement).style.display = this.canMessage
+			? "block"
+			: "none";
+		(document.getElementById("mobileSend") as HTMLElement).style.display = this.canMessage
+			? "block"
+			: "none";
 		(document.getElementById("typediv") as HTMLElement).style.visibility = "visible";
 		if (!mobile) {
 			(document.getElementById("typebox") as HTMLDivElement).focus();
@@ -3461,6 +3464,9 @@ class Channel extends SnowFlake {
 			this.hasPermission("MANAGE_CHANNELS")
 		)
 			return true;
+
+		if (this.rate_limit_per_user === 0) return true;
+
 		let canMessage = t + this.rate_limit_per_user * 1000;
 		return canMessage <= Date.now();
 	}

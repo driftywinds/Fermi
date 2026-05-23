@@ -78,6 +78,10 @@ body {
 	div {
 		margin-left: 8px;
 	}
+	.pfp {
+		width: 32px;
+		height: 32px;
+	}
 }
 .templateMiniBox {
 	display: flex;
@@ -182,6 +186,23 @@ body {
 .flexltr {
 	min-height: 0;
 	display: flex;
+}
+.instDiv {
+	img {
+		width: 32px;
+		height: 32px;
+		margin-right: 4px;
+		border-radius: 4px;
+	}
+	div {
+		align-items: center;
+		margin-bottom: 10px;
+	}
+	background: #0000004d;
+	padding: 4px 8px;
+	border-radius: 4px;
+	align-items: center;
+	cursor: pointer;
 }
 .amsCont {
 	display: flex;
@@ -421,6 +442,9 @@ body {
 .searchOptions:empty {
 	padding: 0;
 	border: 0;
+}
+.userNote {
+	max-width: 100% !important;
 }
 #player {
 	flex-grow: 0;

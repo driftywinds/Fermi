@@ -354,6 +354,42 @@ class CheckboxInput implements OptionsElement<boolean> {
 	}
 }
 
+class SubButtonInput implements OptionsElement<void> {
+	readonly owner: Options;
+	readonly onClick: (opt: Options) => void;
+	textContent: string;
+	value!: void;
+	opts?: {noSubmit?: boolean; ltr?: boolean; intText?: string};
+
+	constructor(
+		textContent: string,
+		onClick: (opt: Options) => void,
+		owner: Options,
+		{} = {},
+		opts?: SubButtonInput["opts"],
+	) {
+		this.owner = owner;
+		this.onClick = onClick;
+		this.textContent = textContent;
+		this.opts = opts;
+	}
+	buttonHtml?: HTMLButtonElement;
+	generateHTML(): HTMLDivElement {
+		const div = document.createElement("div");
+		const button = document.createElement("button");
+		button.classList.add("subButton");
+		button.textContent = this.textContent;
+		button.onclick = () => {
+			this.onClick(this.owner.addSubOptions(this.opts?.intText ?? this.textContent, this.opts));
+		};
+		this.buttonHtml = button;
+		div.append(button);
+		return div;
+	}
+	watchForChange() {}
+	submit() {}
+}
+
 class ButtonInput implements OptionsElement<void> {
 	readonly label: string;
 	readonly owner: Options;
@@ -1516,6 +1552,16 @@ class Options implements OptionsElement<void> {
 		this.generate(button);
 		return button;
 	}
+	addSubButtonInput(
+		textContent: string,
+		onSubmit: (opt: Options) => void,
+		{ltr = false, noSubmit = false, intText = ""} = {},
+	) {
+		const button = new SubButtonInput(textContent, onSubmit, this, {ltr, noSubmit, intText});
+		this.options.push(button);
+		this.generate(button);
+		return button;
+	}
 	addCheckboxInput(label: string, onSubmit: (str: boolean) => void, {initState = false} = {}) {
 		const box = new CheckboxInput(label, onSubmit, this, {initState});
 		this.options.push(box);
@@ -1966,6 +2012,13 @@ class Form implements OptionsElement<object> {
 			(this.button.deref() as HTMLElement).hidden = true;
 		}
 		return this.options.addSubOptions(name, {ltr, noSubmit});
+	}
+	addSubButtonInput(
+		textContent: string,
+		onSubmit: (opt: Options) => void,
+		{ltr = false, noSubmit = false, intText = ""} = {},
+	) {
+		return this.options.addSubButtonInput(textContent, onSubmit, {ltr, noSubmit, intText});
 	}
 	addHTMLArea(html: (() => HTMLElement) | HTMLElement, onSubmit = () => {}) {
 		return this.options.addHTMLArea(html, onSubmit);

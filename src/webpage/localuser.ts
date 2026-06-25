@@ -2,7 +2,7 @@ import {Guild} from "./guild.js";
 import {Channel} from "./channel.js";
 import {Direct, Group} from "./direct.js";
 import {User} from "./user.js";
-import {createImg, getapiurls, getBulkUsers, installPGet, SW} from "./utils/utils.js";
+import {createImg, getapiurls, getBulkUsers, getInstances, installPGet, SW} from "./utils/utils.js";
 import {getBulkInfo, setTheme, Specialuser} from "./utils/utils.js";
 import {
 	channeljson,
@@ -49,6 +49,7 @@ import {getLocalSettings, ServiceWorkerModeValues} from "./utils/storage/localSe
 import {PromiseLock} from "./utils/promiseLock.js";
 import {CDNParams} from "./utils/cdnParams.js";
 import {SnowFlake} from "./snowflake.js";
+import {trimTrailingSlashes} from "./utils/netUtils.js";
 type traceObj = {
 	micros: number;
 	calls?: (string | traceObj)[];
@@ -1451,6 +1452,18 @@ class Localuser {
 		elms.set("online", online);
 		this.generateListHTML(elms, channel);
 	}
+	instanceString(): string {
+		const insts = getInstances();
+		if (insts) {
+			for (const inst of insts) {
+				if (trimTrailingSlashes(inst.url ?? "") === trimTrailingSlashes(this.info.wellknown)) {
+					return inst.name;
+				}
+			}
+		}
+		console.log("failed with", insts, this.info.wellknown);
+		return this.info.wellknown;
+	}
 	roleListMap = new WeakMap<
 		HTMLDivElement,
 		{
@@ -2731,9 +2744,9 @@ class Localuser {
 			const genSecurity = () => {
 				security.removeAll();
 				if (this.mfa_enabled) {
-					security.addButtonInput("", I18n.localuser["2faDisable"](), () => {
-						const form = security.addSubForm(
-							I18n.localuser["2faDisable"](),
+					security.addSubButtonInput(I18n.localuser["2faDisable"](), (sub) => {
+						const form = sub.addForm(
+							"",
 							(_: any) => {
 								if (_.message) {
 									switch (_.code) {
@@ -2755,13 +2768,13 @@ class Localuser {
 						form.addTextInput(I18n.localuser["2faCode:"](), "code", {required: true});
 					});
 				} else {
-					security.addButtonInput("", I18n.localuser["2faEnable"](), async () => {
+					security.addSubButtonInput(I18n.localuser["2faEnable"](), async (sub) => {
 						let secret = "";
 						for (let i = 0; i < 18; i++) {
 							secret += "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"[Math.floor(Math.random() * 32)];
 						}
-						const form = security.addSubForm(
-							I18n.localuser.setUp2fa(),
+						const form = sub.addForm(
+							"",
 							(_: any) => {
 								if (_.message) {
 									switch (_.code) {
@@ -2794,8 +2807,7 @@ class Localuser {
 					});
 				}
 				{
-					security.addButtonInput("", I18n.webauth.manage(), () => {
-						const keyMenu = security.addSubOptions("Manage Keys");
+					security.addSubButtonInput(I18n.webauth.manage(), (keyMenu) => {
 						const addKey = (key: {name: string; id: string}) => {
 							keyMenu.addButtonInput("", key.name, () => {
 								const opt = keyMenu.addSubOptions(key.name);
@@ -2882,9 +2894,9 @@ class Localuser {
 							});
 					});
 				}
-				security.addButtonInput("", I18n.localuser.changeDiscriminator(), () => {
-					const form = security.addSubForm(
-						I18n.localuser.changeDiscriminator(),
+				security.addSubButtonInput(I18n.localuser.changeDiscriminator(), (sub) => {
+					const form = sub.addForm(
+						"",
 						(_) => {
 							security.returnFromSub();
 						},
@@ -2896,9 +2908,9 @@ class Localuser {
 					);
 					form.addTextInput(I18n.localuser.newDiscriminator(), "discriminator");
 				});
-				security.addButtonInput("", I18n.localuser.changeEmail(), () => {
-					const form = security.addSubForm(
-						I18n.localuser.changeEmail(),
+				security.addSubButtonInput(I18n.localuser.changeEmail(), (sub) => {
+					const form = sub.addForm(
+						"",
 						(_) => {
 							security.returnFromSub();
 						},
@@ -2916,9 +2928,9 @@ class Localuser {
 					}
 					form.addTextInput(I18n.localuser["newEmail:"](), "email");
 				});
-				security.addButtonInput("", I18n.localuser.changeUsername(), () => {
-					const form = security.addSubForm(
-						I18n.localuser.changeUsername(),
+				security.addSubButtonInput(I18n.localuser.changeUsername(), (sub) => {
+					const form = sub.addForm(
+						"",
 						(_) => {
 							security.returnFromSub();
 						},
@@ -2936,9 +2948,9 @@ class Localuser {
 					}
 					form.addTextInput(I18n.localuser.newUsername(), "username");
 				});
-				security.addButtonInput("", I18n.localuser.changePassword(), () => {
-					const form = security.addSubForm(
-						I18n.localuser.changePassword(),
+				security.addSubButtonInput(I18n.localuser.changePassword(), (sub) => {
+					const form = sub.addForm(
+						"",
 						(_) => {
 							security.returnFromSub();
 						},
@@ -3196,9 +3208,9 @@ class Localuser {
 			}).then(async (teamsRes) => {
 				const teams = await teamsRes.json();
 
-				const button = devPortal.addButtonInput("", I18n.localuser.createApp(), () => {
-					const form = devPortal.addSubForm(
-						I18n.localuser.createApp(),
+				const button = devPortal.addSubButtonInput(I18n.localuser.createApp(), (sub) => {
+					const form = sub.addForm(
+						"",
 						(json: any) => {
 							if (json.message) form.error("name", json.message);
 							else {
@@ -3412,111 +3424,114 @@ class Localuser {
 				});
 			}
 			if (this.rights.hasPermission("CREATE_REGISTRATION_TOKENS")) {
-				manageInstance.addButtonInput("", I18n.manageInstance.createTokens(), () => {
-					const tokens = manageInstance.addSubOptions(I18n.manageInstance.createTokens(), {
-						noSubmit: true,
-					});
-					const count = tokens.addTextInput(I18n.manageInstance.count(), () => {}, {
-						initText: "1",
-					});
-					const length = tokens.addTextInput(I18n.manageInstance.length(), () => {}, {
-						initText: "32",
-					});
-					const format = tokens.addSelect(
-						I18n.manageInstance.format(),
-						() => {},
-						[
-							I18n.manageInstance.TokenFormats.JSON(),
-							I18n.manageInstance.TokenFormats.plain(),
-							I18n.manageInstance.TokenFormats.URLs(),
-						],
-						{
-							defaultIndex: 2,
-						},
-					);
-					format.watchForChange((e) => {
-						if (e !== 2) {
-							urlOption.removeAll();
-						} else {
-							makeURLMenu();
-						}
-					});
-					const urlOption = tokens.addOptions("");
-					const urlOptionsJSON = {
-						url: window.location.origin,
-						type: "Jank",
-					};
-					function makeURLMenu() {
-						urlOption
-							.addTextInput(I18n.manageInstance.clientURL(), () => {}, {
-								initText: urlOptionsJSON.url,
-							})
-							.watchForChange((str) => {
-								urlOptionsJSON.url = str;
-							});
-						urlOption
-							.addSelect(
-								I18n.manageInstance.regType(),
-								() => {},
-								["Jank", I18n.manageInstance.genericType()],
-								{
-									defaultIndex: ["Jank", "generic"].indexOf(urlOptionsJSON.type),
-								},
-							)
-							.watchForChange((i) => {
-								urlOptionsJSON.type = ["Jank", "generic"][i];
-							});
-					}
-					makeURLMenu();
-					tokens.addButtonInput("", I18n.manageInstance.create(), async () => {
-						const params = new URLSearchParams();
-						params.set("count", count.value);
-						params.set("length", length.value);
-						const json = (await (
-							await fetch(
-								this.info.api + "/auth/generate-registration-tokens?" + params.toString(),
-								{
-									headers: this.headers,
-								},
-							)
-						).json()) as {tokens: string[]};
-						if (format.index === 0) {
-							pre.textContent = JSON.stringify(json.tokens);
-						} else if (format.index === 1) {
-							pre.textContent = json.tokens.join("\n");
-						} else if (format.index === 2) {
-							if (urlOptionsJSON.type === "Jank") {
-								const options = new URLSearchParams();
-								options.set("instance", this.info.wellknown);
-								pre.textContent = json.tokens
-									.map((token) => {
-										options.set("token", token);
-										return `${urlOptionsJSON.url}/register?` + options.toString();
-									})
-									.join("\n");
+				manageInstance.addSubButtonInput(
+					I18n.manageInstance.createTokens(),
+					(tokens) => {
+						const count = tokens.addTextInput(I18n.manageInstance.count(), () => {}, {
+							initText: "1",
+						});
+						const length = tokens.addTextInput(I18n.manageInstance.length(), () => {}, {
+							initText: "32",
+						});
+						const format = tokens.addSelect(
+							I18n.manageInstance.format(),
+							() => {},
+							[
+								I18n.manageInstance.TokenFormats.JSON(),
+								I18n.manageInstance.TokenFormats.plain(),
+								I18n.manageInstance.TokenFormats.URLs(),
+							],
+							{
+								defaultIndex: 2,
+							},
+						);
+						format.watchForChange((e) => {
+							if (e !== 2) {
+								urlOption.removeAll();
 							} else {
-								const options = new URLSearchParams();
-								pre.textContent = json.tokens
-									.map((token) => {
-										options.set("token", token);
-										return `${urlOptionsJSON.url}/register?` + options.toString();
-									})
-									.join("\n");
+								makeURLMenu();
 							}
+						});
+						const urlOption = tokens.addOptions("");
+						const urlOptionsJSON = {
+							url: window.location.origin,
+							type: "Fermi",
+						};
+						function makeURLMenu() {
+							urlOption
+								.addTextInput(I18n.manageInstance.clientURL(), () => {}, {
+									initText: urlOptionsJSON.url,
+								})
+								.watchForChange((str) => {
+									urlOptionsJSON.url = str;
+								});
+							urlOption
+								.addSelect(
+									I18n.manageInstance.regType(),
+									() => {},
+									["Fermi", I18n.manageInstance.genericType()],
+									{
+										defaultIndex: ["Fermi", "generic"].indexOf(urlOptionsJSON.type),
+									},
+								)
+								.watchForChange((i) => {
+									urlOptionsJSON.type = ["Fermi", "generic"][i];
+								});
 						}
-					});
-					tokens.addButtonInput("", I18n.manageInstance.copy(), async () => {
-						try {
-							if (pre.textContent) {
-								await navigator.clipboard.writeText(pre.textContent);
+						makeURLMenu();
+						tokens.addButtonInput("", I18n.manageInstance.create(), async () => {
+							const params = new URLSearchParams();
+							params.set("count", count.value);
+							params.set("length", length.value);
+							const json = (await (
+								await fetch(
+									this.info.api + "/auth/generate-registration-tokens?" + params.toString(),
+									{
+										headers: this.headers,
+									},
+								)
+							).json()) as {tokens: string[]};
+							if (format.index === 0) {
+								pre.textContent = JSON.stringify(json.tokens);
+							} else if (format.index === 1) {
+								pre.textContent = json.tokens.join("\n");
+							} else if (format.index === 2) {
+								if (urlOptionsJSON.type === "Fermi") {
+									const options = new URLSearchParams();
+									options.set("instance", this.instanceString());
+									pre.textContent = json.tokens
+										.map((token) => {
+											options.set("token", token);
+											return `${urlOptionsJSON.url}/register?` + options.toString();
+										})
+										.join("\n");
+								} else {
+									const options = new URLSearchParams();
+									pre.textContent = json.tokens
+										.map((token) => {
+											options.set("token", token);
+											return `${urlOptionsJSON.url}/register?` + options.toString();
+										})
+										.join("\n");
+								}
 							}
-						} catch (err) {
-							console.error(err);
-						}
-					});
-					const pre = document.createElement("pre");
-					tokens.addHTMLArea(pre);
-				});
+						});
+						tokens.addButtonInput("", I18n.manageInstance.copy(), async () => {
+							try {
+								if (pre.textContent) {
+									await navigator.clipboard.writeText(pre.textContent);
+								}
+							} catch (err) {
+								console.error(err);
+							}
+						});
+						const pre = document.createElement("pre");
+						tokens.addHTMLArea(pre);
+					},
+					{
+						noSubmit: true,
+					},
+				);
 			}
 		}
 		(async () => {
@@ -3868,10 +3883,15 @@ class Localuser {
 			initText: json.privacy_policy_url,
 		});
 		form.addText(I18n.localuser.appID(appId));
-		form.addButtonInput("", I18n.localuser.showSecret(), () => {
-			const opt = form.addSubOptions(I18n.localuser.secret());
-			opt.addText(I18n.localuser.clientSecret(json.verify_key));
-		});
+		form.addSubButtonInput(
+			I18n.localuser.showSecret(),
+			(opt) => {
+				opt.addText(I18n.localuser.clientSecret(json.verify_key));
+			},
+			{
+				intText: I18n.localuser.secret(),
+			},
+		);
 		form.addTextInput(I18n.localuser.TOSURL(), "terms_of_service_url", {
 			initText: json.terms_of_service_url,
 		});

@@ -64,7 +64,7 @@ export async function makeInviteMenu(inviteMenu: Options, guild: Guild, url: str
 						"/invite/" +
 						invite.code +
 						"?" +
-						new URLSearchParams([["instance", guild.info.wellknown]]),
+						new URLSearchParams([["instance", guild.localuser.instanceString()]]),
 					undefined,
 				),
 			);
@@ -1074,8 +1074,7 @@ class Guild extends SnowFlake {
 
 		if (this.member.hasPermission("BAN_MEMBERS")) {
 			const banMenu = settings.addButton(I18n.guild.bans());
-			banMenu.addButtonInput("", I18n.guild.banId(), () => {
-				const opt = banMenu.addSubOptions(I18n.guild.banId(), {noSubmit: true});
+			banMenu.addSubButtonInput(I18n.guild.banId(), (opt) => {
 				const reason = opt.addTextInput(I18n.member["reason:"](), () => {});
 				opt.addTextInput(I18n.guild.idSel(), async (id) => {
 					const headers = structuredClone(this.headers);
@@ -1283,7 +1282,7 @@ class Guild extends SnowFlake {
 								headers: this.headers,
 							},
 						);
-						const search = new URLSearchParams([["instance", this.info.wellknown]]);
+						const search = new URLSearchParams([["instance", this.localuser.instanceString()]]);
 						form.addMDText(
 							new MarkDown(
 								I18n.guild.templateURL(
@@ -1314,8 +1313,8 @@ class Guild extends SnowFlake {
 					div.append(code, edit);
 					template.addHTMLArea(div);
 				};
-				template.addButtonInput("", I18n.guild.createNewTemplate(), () => {
-					const form = template.addSubForm(
+				template.addSubButtonInput(I18n.guild.createNewTemplate(), (opt) => {
+					const form = opt.addForm(
 						I18n.guild.createNewTemplate(),
 						(code) => {
 							template.returnFromSub();
@@ -1432,7 +1431,7 @@ class Guild extends SnowFlake {
 				.then((_) => _.json())
 				.then((json) => {
 					const params = new URLSearchParams("");
-					params.set("instance", this.info.wellknown);
+					params.set("instance", this.localuser.instanceString());
 					const encoded = params.toString();
 					text.textContent = `${location.origin}/invite/${json.code}?${encoded}`;
 				});

@@ -427,18 +427,18 @@ class Message extends SnowFlake {
 				continue;
 			} else if (thing === "sticker_items") {
 				this.stickers = (messagejson.sticker_items || []).map((_) => {
-					const guild = this.localuser.guildids.get(_.guild_id as string);
+					const guild = this.localuser.guilds.get(_.guild_id as string);
 					return new Sticker(_, guild || this.localuser);
 				});
 			} else if (thing === "components" && messagejson.components) {
 				this.components = new Components(messagejson.components, this);
 				continue;
 			} else if (thing === "thread" && messagejson.thread) {
-				let thread = this.localuser.channelids.get(messagejson.thread.id);
+				let thread = this.localuser.channels.get(messagejson.thread.id);
 				if (!thread) {
 					thread = new Channel(messagejson.thread, this.guild);
 					thread.resolveparent();
-					this.localuser.channelids.set(thread.id, thread);
+					this.localuser.channels.set(thread.id, thread);
 				}
 				this.thread = thread;
 				continue;

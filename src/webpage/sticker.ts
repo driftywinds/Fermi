@@ -58,9 +58,9 @@ class Sticker extends SnowFlake {
 			}
 		}
 		const weakGuild = new WeakMap<Sticker, Guild>();
-		for (const guild of localuser.guilds) {
-			if (guild.id !== "@me" && guild.stickers.length !== 0) {
-				for (const sticker of guild.stickers) {
+		for (const guild of localuser.guilds.values()) {
+			if (guild.id !== "@me" && guild.stickers.size !== 0) {
+				for (const [, sticker] of guild.stickers) {
 					if (similar(sticker)) {
 						weakGuild.set(sticker, guild);
 					}
@@ -73,8 +73,8 @@ class Sticker extends SnowFlake {
 		});
 	}
 	static getFromId(id: string, localuser: Localuser) {
-		for (const guild of localuser.guilds) {
-			const stick = guild.stickers.find((_) => _.id === id);
+		for (const guild of localuser.guilds.values()) {
+			const stick = guild.stickers.get(id);
 			if (stick) {
 				return stick;
 			}
@@ -83,9 +83,11 @@ class Sticker extends SnowFlake {
 	}
 	static emojiMap = new WeakMap<Localuser, Map<string, Sticker | void>>();
 	static async lookupEmoji(id: string, localuser: Localuser): Promise<Sticker | void> {
-		const guild = localuser.guilds.find((guild) => guild.emojis.find((emoji) => emoji.id === id));
+		const guild = localuser.guilds
+			.values()
+			.find((guild) => guild.emojis.find((emoji) => emoji.id === id));
 		if (guild) {
-			const sticker = guild.stickers.find((_) => _.id === id);
+			const sticker = guild.stickers.get(id);
 			if (sticker) return sticker;
 		}
 
@@ -127,11 +129,11 @@ class Sticker extends SnowFlake {
 		const topBar = document.createElement("div");
 		topBar.classList.add("flexltr", "emojiHeading");
 		const guilds = [
-			localuser.lookingguild,
-			...localuser.guilds.filter((guild) => guild !== localuser.lookingguild),
+			localuser.focusGuild,
+			...localuser.guilds.values().filter((guild) => guild !== localuser.focusGuild),
 		]
 			.filter((guild) => guild !== undefined)
-			.filter((guild) => guild.id != "@me" && guild.stickers.length > 0);
+			.filter((guild) => guild.id != "@me" && guild.stickers.size > 0);
 		if (guilds.length === 0) {
 			const title = document.createElement("h2");
 			title.textContent = I18n.noStickers();
@@ -238,7 +240,7 @@ class Sticker extends SnowFlake {
 				updateSearch.call(this);
 				title.textContent = guild.properties.name;
 				body.innerHTML = "";
-				for (const sticker of guild.stickers) {
+				for (const [, sticker] of guild.stickers) {
 					const stickerElem = document.createElement("div");
 					stickerElem.classList.add("stickerSelect");
 					stickerElem.append(sticker.getHTML());

@@ -41,11 +41,11 @@ import {CDNParams} from "./utils/cdnParams.js";
 class Channel extends SnowFlake {
 	editing!: Message | null;
 	type!: number;
-	owner!: Guild;
-	headers!: Localuser["headers"];
+	owner: Guild;
+	headers: Localuser["headers"];
 	name!: string;
 	parent_id?: string;
-	parent: Channel | undefined;
+	parent?: Channel;
 	children!: Channel[];
 	guild_id!: string;
 	permission_overwrites!: Map<string, Permissions>;
@@ -679,7 +679,7 @@ class Channel extends SnowFlake {
 		if (json === -1) {
 			return;
 		}
-		this.localuser.channelids.set(this.id, this);
+		this.localuser.channels.set(this.id, this);
 		this.flags = json.flags || 0;
 		this.memberCount = json.member_count;
 		this.defaultAutoArchiveDuration = json.default_auto_archive_duration;
@@ -905,7 +905,7 @@ class Channel extends SnowFlake {
 	resolveparent(_guild: Guild = this.owner) {
 		const parentid = this.parent_id;
 		if (!parentid) return false;
-		this.parent = this.localuser.channelids.get(parentid);
+		this.parent = this.localuser.channels.get(parentid);
 		this.parent ??= undefined;
 		if (this.parent !== undefined) {
 			this.parent.children.push(this);
@@ -1141,7 +1141,7 @@ class Channel extends SnowFlake {
 	}
 	owner_id?: string;
 	threadVis() {
-		return (this.member && !this.threadData?.archived) || this.localuser.channelfocus === this;
+		return (this.member && !this.threadData?.archived) || this.localuser.focusChannel === this;
 	}
 	async moveForDrag(x: number) {
 		const mainarea = document.getElementById("mainarea");
@@ -1509,7 +1509,7 @@ class Channel extends SnowFlake {
 			loading.classList.remove("loading");
 		}
 
-		if (this.localuser.channelfocus !== this) {
+		if (this.localuser.focusChannel !== this) {
 			await this.getHTML(true);
 		}
 
@@ -1968,7 +1968,7 @@ class Channel extends SnowFlake {
 		typebox.markdown.boxEnabled = false;
 		const func = () => {
 			const node = window.getSelection()?.focusNode;
-			if (this.localuser.channelfocus === this) {
+			if (this.localuser.focusChannel === this) {
 				const out = command.collect(typebox, this, node || undefined);
 				if (!out) {
 					typebox.markdown.boxEnabled = true;
@@ -2167,13 +2167,13 @@ class Channel extends SnowFlake {
 			has_more: boolean;
 		};
 		for (const threadjson of res.threads) {
-			if (this.localuser.channelids.has(threadjson.id)) continue;
+			if (this.localuser.channels.has(threadjson.id)) continue;
 			const thread = new Channel(threadjson, this.guild);
-			this.localuser.channelids.set(threadjson.id, thread);
+			this.localuser.channels.set(threadjson.id, thread);
 			thread.resolveparent();
 		}
 		for (const message of res.messages) {
-			const thread = this.localuser.channelids.get(message.channel_id);
+			const thread = this.localuser.channels.get(message.channel_id);
 			if (!thread) continue;
 			const m = this.localuser.messages.get(message.id);
 			if (!m) this.localuser.messages.set(message.id, new Message(message, thread));
@@ -2608,8 +2608,8 @@ class Channel extends SnowFlake {
 		if (this.owner instanceof Direct) {
 			this.owner.freindDiv?.classList.remove("viewChannel");
 		}
-		if (this.localuser.channelfocus) {
-			this.localuser.channelfocus.collectBox();
+		if (this.localuser.focusChannel) {
+			this.localuser.focusChannel.collectBox();
 		}
 		const typebox = document.getElementById("typebox") as CustomHTMLDivElement;
 		typebox.markdown.boxEnabled = !this.curCommand;
@@ -2684,34 +2684,34 @@ class Channel extends SnowFlake {
 			channelTopic.setAttribute("hidden", "");
 			channelTopic.onclick = () => {};
 		}
-		if (this.guild !== this.localuser.lookingguild) {
+		if (this.guild !== this.localuser.focusGuild) {
 			this.guild.loadGuild();
 		}
 
-		if (this.localuser.channelfocus && this.localuser.channelfocus.myhtml) {
-			this.localuser.channelfocus.myhtml.classList.remove("viewChannel");
+		if (this.localuser.focusChannel && this.localuser.focusChannel.myhtml) {
+			this.localuser.focusChannel.myhtml.classList.remove("viewChannel");
 		}
 		if (this.myhtml) {
 			this.myhtml.classList.add("viewChannel");
 		}
 		const id = ++Channel.genid;
 
-		if (this.localuser.channelfocus && this.localuser.channelfocus !== this) {
-			this.localuser.channelfocus.infinite.delete();
+		if (this.localuser.focusChannel && this.localuser.focusChannel !== this) {
+			this.localuser.focusChannel.infinite.delete();
 
-			if (this.localuser.channelfocus.isThread() && !this.localuser.channelfocus.member) {
-				const prev = this.localuser.channelfocus;
-				this.localuser.channelfocus = this;
+			if (this.localuser.focusChannel.isThread() && !this.localuser.focusChannel.member) {
+				const prev = this.localuser.focusChannel;
+				this.localuser.focusChannel = this;
 				prev.parent?.createguildHTML();
 			}
-		} else if (this.localuser.channelfocus === this && !aroundMessage && !this.isForum()) {
+		} else if (this.localuser.focusChannel === this && !aroundMessage && !this.isForum()) {
 			if (this.lastmessageid)
 				this.infinite.focus(aroundMessage || this.lastmessageid, !!aroundMessage, true);
 			return;
 		}
 		this.guild.prevchannel = this;
 		this.guild.perminfo.prevchannel = this.id;
-		this.localuser.channelfocus = this;
+		this.localuser.focusChannel = this;
 
 		if (this.isThread() && !this.member) {
 			this.parent?.createguildHTML();
@@ -2835,7 +2835,7 @@ class Channel extends SnowFlake {
 			}
 		}
 		build = I18n.typing(i + "", build);
-		if (this.localuser.channelfocus === this) {
+		if (this.localuser.focusChannel === this) {
 			if (showing) {
 				typingtext.classList.remove("hidden");
 				const typingtext2 = document.getElementById("typingtext") as HTMLDivElement;
@@ -3147,7 +3147,7 @@ class Channel extends SnowFlake {
 		} else if (removetitle) {
 			removetitle.remove();
 		}
-		if (this.localuser.channelfocus !== this) {
+		if (this.localuser.focusChannel !== this) {
 			return;
 		}
 		const elements = Array.from(messages.getElementsByClassName("scroller"));
@@ -3226,7 +3226,7 @@ class Channel extends SnowFlake {
 
 		const span = this.nameSpan.deref();
 		if (span) span.textContent = this.name;
-		const parent = this.localuser.channelids.get(json.parent_id);
+		const parent = this.localuser.channels.get(json.parent_id);
 		if (parent) {
 			this.parent = parent;
 			this.parent_id = parent.id;
@@ -3422,7 +3422,7 @@ class Channel extends SnowFlake {
 		dont.style.marginLeft = "4px";
 		buttons.append(retryB, dont);
 
-		if (this === this.localuser.channelfocus) {
+		if (this === this.localuser.focusChannel) {
 			if (!this.infinitefocus) {
 				await this.tryfocusinfinate();
 			}
@@ -3874,7 +3874,7 @@ class Channel extends SnowFlake {
 
 		this.unreads();
 		this.guild.unreads();
-		if (this === this.localuser.channelfocus) {
+		if (this === this.localuser.focusChannel) {
 			if (!this.infinitefocus) {
 				await this.tryfocusinfinate();
 			}
@@ -3887,7 +3887,7 @@ class Channel extends SnowFlake {
 			this.mentions = 0;
 			this.unreads();
 			this.guild.unreads();
-			if (this == this.localuser.channelfocus) {
+			if (this == this.localuser.focusChannel) {
 				setTimeout(() => this.goToBottom());
 			}
 		}
@@ -3896,7 +3896,7 @@ class Channel extends SnowFlake {
 		if (messagez.author === this.localuser.user) {
 			return;
 		}
-		if (this.localuser.lookingguild?.prevchannel === this && document.hasFocus()) {
+		if (this.localuser.focusGuild?.prevchannel === this && document.hasFocus()) {
 			return;
 		}
 

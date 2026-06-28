@@ -249,7 +249,7 @@ class User extends SnowFlake {
 
 	static contextmenu = new Contextmenu<User, Member | undefined>("User Menu");
 	async opendm(message?: string) {
-		for (const dm of (this.localuser.guildids.get("@me") as Direct).channels) {
+		for (const dm of (this.localuser.guilds.get("@me") as Direct).channels) {
 			if ((dm.type === 1 || dm.type === undefined) && dm.users[0].id === this.id) {
 				await this.localuser.goToChannel(dm.id);
 				if (message) {
@@ -275,7 +275,7 @@ class User extends SnowFlake {
 				return this.localuser.goToChannel(json.id);
 			});
 		if (message) {
-			for (const dm of (this.localuser.guildids.get("@me") as Direct).channels) {
+			for (const dm of (this.localuser.guilds.get("@me") as Direct).channels) {
 				if ((dm.type === 1 || dm.type === undefined) && dm.users[0].id === this.id) {
 					dm.sendMessage(message, {
 						attachments: [],
@@ -533,7 +533,7 @@ class User extends SnowFlake {
 					e.stopPropagation();
 					const roles: [Role, string[]][] = [];
 					for (const role of member.guild.roles) {
-						if (!role.canManage() || member.roles.indexOf(role) !== -1) {
+						if (!role.canManage() || member.roles.has(role)) {
 							continue;
 						}
 						roles.push([role, [role.name]]);
@@ -559,7 +559,7 @@ class User extends SnowFlake {
 				if (member) {
 					e.stopPropagation();
 					const roles: [Role, string[]][] = [];
-					for (const role of member.roles) {
+					for (const role of member.inOrderRoles) {
 						if (!role.canManage()) {
 							continue;
 						}
@@ -683,7 +683,7 @@ class User extends SnowFlake {
 		dio.show();
 	}
 	getMembersSync() {
-		return this.localuser.guilds
+		return [...this.localuser.guilds.values()]
 			.map((guild) => {
 				const m = this.members.get(guild);
 				return m instanceof Member ? m : undefined;
@@ -806,7 +806,7 @@ class User extends SnowFlake {
 		return div;
 	}
 	createWidget(guild?: Guild) {
-		guild = this.localuser.guildids.get("@me") as Guild;
+		guild = this.localuser.guilds.get("@me") as Guild;
 		const div = document.createElement("div");
 		div.classList.add("flexltr", "createdWebhook");
 		//TODO make sure this is something I can actually do here
@@ -1038,7 +1038,7 @@ class User extends SnowFlake {
 
 	async block() {
 		await this.changeRelationship(2);
-		const channel = this.localuser.channelfocus;
+		const channel = this.localuser.focusChannel;
 		if (channel) {
 			for (const message of channel.messages) {
 				message[1].generateMessage();
@@ -1048,7 +1048,7 @@ class User extends SnowFlake {
 
 	async unblock() {
 		await this.changeRelationship(0);
-		const channel = this.localuser.channelfocus;
+		const channel = this.localuser.focusChannel;
 		if (channel) {
 			for (const message of channel.messages) {
 				message[1].generateMessage();
@@ -1365,7 +1365,7 @@ class User extends SnowFlake {
 					}
 
 					roles.classList.add("flexltr", "rolesbox");
-					for (const role of member.roles) {
+					for (const role of member.inOrderRoles) {
 						if (role.id === member.guild.id) continue;
 						const roleDiv = document.createElement("div");
 						roleDiv.classList.add("rolediv");
@@ -1422,7 +1422,7 @@ class User extends SnowFlake {
 
 			mutDiv.append(
 				...high.mutual_guilds
-					.map((_) => [this.localuser.guildids.get(_.id), _.nick] as const)
+					.map((_) => [this.localuser.guilds.get(_.id), _.nick] as const)
 					.map(([guild, nick]) => {
 						if (!guild) return;
 						const icon = guild.generateGuildIcon(false);
@@ -1451,7 +1451,7 @@ class User extends SnowFlake {
 					...high.mutual_friends
 						.map((_) => new User(_, this.localuser))
 						.map((user) => {
-							const html = user.createWidget(this.localuser.lookingguild);
+							const html = user.createWidget(this.localuser.focusGuild);
 							html.onclick = (e) => {
 								e.stopImmediatePropagation();
 								e.preventDefault();
@@ -1513,7 +1513,7 @@ class User extends SnowFlake {
 		guild: Guild | null | Member = null,
 		zIndex = -1,
 	): Promise<HTMLDivElement> {
-		const membres = (async () => {
+		const members = (async () => {
 			if (!guild) return;
 			let member: Member | undefined;
 			if (guild instanceof Guild) {
@@ -1537,7 +1537,7 @@ class User extends SnowFlake {
 		}
 		const banner = this.getBanner(guild);
 		div.append(banner);
-		membres.then((member) => {
+		members.then((member) => {
 			if (!member) return;
 			if (member.accent_color && member.accent_color !== 0) {
 				div.style.setProperty(
@@ -1662,7 +1662,7 @@ class User extends SnowFlake {
 		pronounshtml.classList.add("pronouns");
 		userbody.appendChild(pronounshtml);
 
-		membres.then((member) => {
+		members.then((member) => {
 			if (!member) return;
 			if (member.pronouns && member.pronouns !== "") {
 				pronounshtml.textContent = member.pronouns;
@@ -1674,7 +1674,7 @@ class User extends SnowFlake {
 		const biohtml = this.bio.makeHTML();
 		userbody.appendChild(biohtml);
 
-		membres.then((member) => {
+		members.then((member) => {
 			if (!member) return;
 			if (member.bio && member.bio !== "") {
 				//TODO make markdown take Guild
@@ -1694,7 +1694,7 @@ class User extends SnowFlake {
 		};
 
 		if (guild) {
-			membres.then((member) => {
+			members.then((member) => {
 				if (!member) return;
 				send.placeholder = I18n.user.sendMessage(member.name);
 				usernamehtml.textContent = member.name;
@@ -1706,7 +1706,7 @@ class User extends SnowFlake {
 				}
 				const roles = document.createElement("div");
 				roles.classList.add("flexltr", "rolesbox");
-				for (const role of member.roles) {
+				for (const role of member.inOrderRoles) {
 					if (role.id === member.guild.id) continue;
 					const roleDiv = document.createElement("div");
 					roleDiv.classList.add("rolediv");

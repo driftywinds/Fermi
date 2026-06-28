@@ -26,13 +26,12 @@ class Direct extends Guild {
 		// @ts-ignore it's a hack, but it's a hack that works
 		this.properties = {};
 		this.roles = [];
-		this.roleids = new Map();
 		this.prevchannel = undefined;
 		this.properties.name = I18n.DMs.name();
 		for (const thing of json) {
 			const temp = new Group(thing, this);
 			this.channels.push(temp);
-			this.localuser.channelids.set(temp.id, temp);
+			this.localuser.channels.set(temp.id, temp);
 		}
 		this.headchannels = this.channels;
 		this.discovery = new Discovery(this);
@@ -40,13 +39,13 @@ class Direct extends Guild {
 	createChannelpac(json: any) {
 		const thischannel = new Group(json, this);
 		this.channels.push(thischannel);
-		this.localuser.channelids.set(thischannel.id, thischannel);
+		this.localuser.channels.set(thischannel.id, thischannel);
 		this.sortchannels();
 		this.printServers();
 		return thischannel;
 	}
 	delChannel(json: channeljson) {
-		const channel = this.localuser.channelids.get(json.id) as Group;
+		const channel = this.localuser.channels.get(json.id) as Group;
 		super.delChannel(json);
 		if (channel) {
 			channel.del();
@@ -149,7 +148,7 @@ class Direct extends Guild {
 
 		messages.append(container);
 		const checkVoid = () => {
-			if (this.localuser.channelfocus !== undefined || this.localuser.lookingguild !== this) {
+			if (this.localuser.focusChannel !== undefined || this.localuser.focusGuild !== this) {
 				this.localuser.relationshipsUpdate = () => {};
 			}
 		};
@@ -518,13 +517,13 @@ class Group extends Channel {
 	addRec(user: User) {
 		this.users.push(user);
 		this.users = [...new Set(this.users)];
-		if (this.localuser.channelfocus === this) {
+		if (this.localuser.focusChannel === this) {
 			this.localuser.memberListQue();
 		}
 	}
 	removeRec(user: User) {
 		this.users = this.users.filter((u) => u !== user);
-		if (this.localuser.channelfocus === this) {
+		if (this.localuser.focusChannel === this) {
 			this.localuser.memberListQue();
 		}
 	}
@@ -634,7 +633,7 @@ class Group extends Channel {
 	get hasunreads() {
 		return this.mentions !== 0;
 	}
-	all: WeakRef<HTMLElement> = new WeakRef(document.createElement("div"));
+	all = new WeakRef<HTMLElement>(document.createElement("div"));
 	noti?: WeakRef<HTMLElement>;
 	del() {
 		const all = this.all.deref();

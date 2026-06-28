@@ -20,7 +20,6 @@ import {
 	GuildOverrides,
 	commandJson,
 	applicationJson,
-	presencejson,
 	welcomeScreen,
 } from "./jsontypes.js";
 import {User} from "./user.js";
@@ -174,13 +173,13 @@ export async function makeInviteMenu(inviteMenu: Options, guild: Guild, url: str
 	inviteMenu.addHTMLArea(invDiv);
 }
 class Guild extends SnowFlake {
-	owner!: Localuser;
-	headers!: Localuser["headers"];
+	owner: Localuser;
+	headers: Localuser["headers"];
 	channels!: Channel[];
 	properties!: guildjson["properties"];
 	member_count!: number;
 	roles!: Role[];
-	roleids!: Map<string, Role>;
+	readonly roleids = new Map<string, Role>();
 	prevchannel: Channel | undefined;
 	banner!: string;
 	message_notifications!: number;
@@ -191,9 +190,9 @@ class Guild extends SnowFlake {
 	html!: HTMLElement;
 	emojis: emojipjson[] = [];
 	large!: boolean;
-	stickers!: Sticker[];
+	stickers = new Map<string, Sticker>();
 	members = new Set<Member>();
-	static contextmenu = new Contextmenu<Guild, undefined>("guild menu");
+	static readonly contextmenu = new Contextmenu<Guild, void>("guild menu");
 	static setupcontextmenu() {
 		Guild.contextmenu.addButton(
 			() => I18n.guild.makeInvite(),
@@ -347,8 +346,8 @@ class Guild extends SnowFlake {
 		return this.channels.find((_) => _.id === id);
 	}
 	recalcPrivate() {
-		if (this !== this.localuser.lookingguild) return;
-		this.localuser.channelfocus?.slowmode();
+		if (this !== this.localuser.focusGuild) return;
+		this.localuser.focusChannel?.slowmode();
 	}
 	async findAdmin() {
 		const menu = new Dialog(I18n.guild.admins());
@@ -525,58 +524,7 @@ class Guild extends SnowFlake {
 		loadResults();
 	}
 	async searchMembers(limit: number, query: string): Promise<Member[]> {
-		if (this.id !== "@me") {
-			return new Promise<Member[]>((res) => {
-				const nonce = Math.floor(Math.random() * 10 ** 8) + "";
-				this.localuser.ws!.send(
-					JSON.stringify({
-						op: 8,
-						d: {
-							guild_id: [this.id],
-							query,
-							limit,
-							presences: true,
-							nonce,
-						},
-					}),
-				);
-				this.localuser.searchMap.set(
-					nonce,
-					async (e: {
-						chunk_index: number;
-						chunk_count: number;
-						nonce: string;
-						not_found?: string[];
-						members?: memberjson[];
-						presences: presencejson[];
-					}) => {
-						console.log(e);
-						if (e.members && e.members[0]) {
-							if (e.members[0].user) {
-								res(
-									(await Promise.all(e.members.map(async (_) => await Member.new(_, this)))).filter(
-										(_) => _ !== undefined,
-									),
-								);
-							} else {
-								const prom1: Promise<User>[] = [];
-								for (const thing of e.members) {
-									prom1.push(this.localuser.getUser(thing.id));
-								}
-								await Promise.all(prom1);
-								res(
-									(await Promise.all(e.members.map(async (_) => await Member.new(_, this)))).filter(
-										(_) => _ !== undefined,
-									),
-								);
-							}
-						}
-						return [];
-					},
-				);
-			});
-		}
-		return [];
+		return this.localuser.searchMembers(limit, query, this);
 	}
 	async showWelcome() {
 		this.welcomeScreen = await (
@@ -1003,7 +951,7 @@ class Guild extends SnowFlake {
 			containdiv.classList.add("stickersDiv");
 			const genDiv = () => {
 				containdiv.innerHTML = "";
-				for (const sticker of this.stickers) {
+				for (const [_, sticker] of this.stickers) {
 					const div = document.createElement("div");
 					div.classList.add("flexttb", "stickerOption");
 
@@ -1350,7 +1298,7 @@ class Guild extends SnowFlake {
 		}
 		settings.show();
 	}
-	onStickerUpdate = (_stickers: Sticker[]) => {};
+	onStickerUpdate = (_stickers: Map<string, Sticker>) => {};
 	addCommunity(settings: Settings, textChannels: Channel[]) {
 		const com = settings.addButton(I18n.guild.community()).addForm("", () => {}, {
 			fetchURL: this.info.api + "/guilds/" + this.id,
@@ -1539,7 +1487,7 @@ class Guild extends SnowFlake {
 				this.HTMLicon = divy;
 			}
 		}
-		this.roleids = new Map();
+		this.roleids.clear();
 		this.banner = json.banner;
 	}
 	constructor(json: guildjson | -1, owner: Localuser, member: memberjson | User | null) {
@@ -1563,7 +1511,6 @@ class Guild extends SnowFlake {
 			this.properties = json.properties;
 		}
 		this.roles = [];
-		this.roleids = new Map();
 		this.banner = json.properties.banner;
 		this.welcomeScreen = json.properties.welcome_screen;
 		if (json.roles) {
@@ -1596,7 +1543,7 @@ class Guild extends SnowFlake {
 		for (const thing of json.channels) {
 			const temp = new Channel(thing, this);
 			this.channels.push(temp);
-			this.localuser.channelids.set(temp.id, temp);
+			this.localuser.channels.set(temp.id, temp);
 		}
 
 		this.headchannels = [];
@@ -1607,13 +1554,13 @@ class Guild extends SnowFlake {
 			}
 		}
 		for (const thread of json.threads) {
-			if (this.localuser.channelids.has(thread.id)) continue;
+			if (this.localuser.channels.has(thread.id)) continue;
 			const temp = new Channel(thread, this);
-			this.localuser.channelids.set(temp.id, temp);
+			this.localuser.channels.set(temp.id, temp);
 			temp.resolveparent(this);
 		}
-		this.prevchannel = this.localuser.channelids.get(this.perminfo.prevchannel);
-		this.stickers = json.stickers.map((_) => new Sticker(_, this)) || [];
+		this.prevchannel = this.localuser.channels.get(this.perminfo.prevchannel);
+		this.stickers = new Map(json.stickers.map((_) => [_.id, new Sticker(_, this)] as const) || []);
 	}
 	get perminfo() {
 		return this.localuser.perminfo.guilds[this.id];
@@ -1626,7 +1573,7 @@ class Guild extends SnowFlake {
 		this.mute_config = this.mute_config;
 		this.message_notifications = settings.message_notifications;
 		for (const override of settings.channel_overrides) {
-			const channel = this.localuser.channelids.get(override.channel_id);
+			const channel = this.localuser.channels.get(override.channel_id);
 			if (!channel) continue;
 			channel.handleUserOverrides(override);
 		}
@@ -1783,7 +1730,6 @@ class Guild extends SnowFlake {
 		noti.classList.add("unread");
 		divy.append(noti);
 		if (guild instanceof Guild && autoLink) {
-			guild.localuser.guildhtml.set(guild.id, divy);
 			guild.html = divy;
 		}
 		let icon: string | null;
@@ -1917,7 +1863,7 @@ class Guild extends SnowFlake {
 		}
 	}
 	async goToThread(threadId: string) {
-		if (!this.localuser.channelids.has(threadId)) {
+		if (!this.localuser.channels.has(threadId)) {
 			const channelJson = await (
 				await fetch(this.info.api + "/channels/" + threadId, {
 					headers: this.headers,
@@ -1925,9 +1871,9 @@ class Guild extends SnowFlake {
 			).json();
 			if (channelJson.code == 200) {
 				const channel = new Channel(channelJson as channeljson, this);
-				this.localuser.channelids.set(channel.id, channel);
+				this.localuser.channels.set(channel.id, channel);
 				channel.resolveparent(this);
-				const par = this.localuser.channelids.get(channel.parent_id as string);
+				const par = this.localuser.channels.get(channel.parent_id as string);
 				par?.createguildHTML();
 			} else {
 				this.loadChannel();
@@ -1993,7 +1939,7 @@ class Guild extends SnowFlake {
 	}
 	async loadChannel(ID?: string | undefined | null, addstate = true, message?: string) {
 		if (ID) {
-			const channel = this.localuser.channelids.get(ID);
+			const channel = this.localuser.channels.get(ID);
 			if (channel) {
 				await channel.getHTML(addstate, undefined, message);
 				return;
@@ -2019,17 +1965,17 @@ class Guild extends SnowFlake {
 		this.noChannel(addstate);
 	}
 	removePrevChannel() {
-		if (this.localuser.channelfocus) {
-			this.localuser.channelfocus.infinite.delete();
+		if (this.localuser.focusChannel) {
+			this.localuser.focusChannel.infinite.delete();
 		}
-		if (this !== this.localuser.lookingguild) {
+		if (this !== this.localuser.focusGuild) {
 			this.loadGuild();
 		}
-		if (this.localuser.channelfocus && this.localuser.channelfocus.myhtml) {
-			this.localuser.channelfocus.myhtml.classList.remove("viewChannel");
+		if (this.localuser.focusChannel && this.localuser.focusChannel.myhtml) {
+			this.localuser.focusChannel.myhtml.classList.remove("viewChannel");
 		}
 		this.prevchannel = undefined;
-		this.localuser.channelfocus = undefined;
+		this.localuser.focusChannel = undefined;
 		const replybox = document.getElementById("replybox") as HTMLElement;
 		const typebox = document.getElementById("typebox") as HTMLElement;
 		replybox.classList.add("hideReplyBox");
@@ -2070,7 +2016,7 @@ class Guild extends SnowFlake {
 		this.localuser.loadGuild(this.id);
 	}
 	updateChannel(json: channeljson) {
-		const channel = this.localuser.channelids.get(json.id);
+		const channel = this.localuser.channels.get(json.id);
 		if (channel) {
 			const parent = channel.parent;
 			channel.updateChannel(json);
@@ -2093,7 +2039,7 @@ class Guild extends SnowFlake {
 	}
 	createChannelpac(json: channeljson) {
 		const thischannel = new Channel(json, this);
-		this.localuser.channelids.set(json.id, thischannel);
+		this.localuser.channels.set(json.id, thischannel);
 		this.channels.push(thischannel);
 		thischannel.resolveparent(this);
 		if (!thischannel.parent) {
@@ -2138,8 +2084,8 @@ class Guild extends SnowFlake {
 		channelselect.show();
 	}
 	delChannel(json: channeljson) {
-		const channel = this.localuser.channelids.get(json.id);
-		this.localuser.channelids.delete(json.id);
+		const channel = this.localuser.channels.get(json.id);
+		this.localuser.channels.delete(json.id);
 		if (!channel) return;
 		this.channels.splice(this.channels.indexOf(channel), 1);
 		const indexy = this.headchannels.indexOf(channel);

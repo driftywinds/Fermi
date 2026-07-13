@@ -7,14 +7,14 @@ on:
 jobs:
   tsc:
     name: tsc
-    runs-on: ubuntu-latest
+    runs-on: codeberg-tiny
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: install node v22
       uses: actions/setup-node@v1
       with:
         node-version: 22
     - name: npm i
       run: npm i
-    - name: tsc
-      run: tsc --noEmit
+    - name: npm run tsc
+      run: npm run tsc --noEmit

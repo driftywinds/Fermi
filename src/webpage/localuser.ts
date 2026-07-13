@@ -50,6 +50,7 @@ import {PromiseLock} from "./utils/promiseLock.js";
 import {CDNParams} from "./utils/cdnParams.js";
 import {SnowFlake} from "./snowflake.js";
 import {trimTrailingSlashes} from "./utils/netUtils.js";
+import {Versions} from "./versions.js";
 type traceObj = {
 	micros: number;
 	calls?: (string | traceObj)[];
@@ -294,6 +295,7 @@ class Localuser {
 
 		if (this.perminfo.user.disableColors === undefined) this.perminfo.user.disableColors = true;
 		this.updateTranslations();
+		Versions.makeVersion(this.info.api, "start");
 	}
 	favorites!: Favorites;
 	readysup = false;
@@ -2457,7 +2459,20 @@ class Localuser {
 		});
 	}
 	async getPosts() {
-		return (await (await fetch("https://blog.fermi.chat/feed_json_created.json")).json()) as {
+		const text = await (await fetch("https://blog.fermi.chat/feed_rss_created.xml")).text();
+		const xml = new DOMParser().parseFromString(text, "text/xml");
+		console.log(xml, text);
+		const posts = Array.from(xml.getElementsByTagName("channel")[0].getElementsByTagName("item"));
+		return {
+			items: posts.map((post) => {
+				return {
+					url: post.getElementsByTagName("link")[0].textContent,
+					title: post.getElementsByTagName("title")[0].textContent,
+					content_html: post.getElementsByTagName("description")[0].textContent,
+					image: post.getElementsByTagName("image")[0]?.textContent ?? null,
+				};
+			}),
+		} satisfies {
 			items: {
 				url: string;
 				title: string;
@@ -4996,11 +5011,12 @@ class Localuser {
 		}
 	}
 	static get fonts() {
+		const isFirefox = navigator.userAgent.toLowerCase().includes("firefox");
 		return [
-			["NotoColorEmoji-Regular.ttf", "Noto Color Emoji"],
-			["OpenMoji-color-glyf_colr_0.woff2", "OpenMoji"],
-			["Twemoji-16.0.1.ttf", "Twemoji"],
-			["BlobmojiCompat.ttf", "Blobmoji"],
+			[`NotoColorEmoji-Regular.${isFirefox ? "woff2" : "ttf"}`, "Noto Color Emoji"],
+			[`OpenMoji-color-glyf_colr_0.woff2`, "OpenMoji"],
+			[`Twemoji-16.0.1.${isFirefox ? "woff2" : "ttf"}`, "Twemoji"],
+			[`BlobmojiCompat.${isFirefox ? "woff2" : "ttf"}`, "Blobmoji"],
 		] as const;
 	}
 	getMemberMap = new Map<string, Promise<Member | undefined>>();

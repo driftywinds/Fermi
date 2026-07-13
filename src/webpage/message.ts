@@ -5,7 +5,6 @@ import {MarkDown, saveCaretPosition} from "./markdown.js";
 import {Embed} from "./embed.js";
 import {Channel} from "./channel.js";
 import {Localuser} from "./localuser.js";
-import {Role} from "./role.js";
 import {File} from "./file.js";
 import {SnowFlake} from "./snowflake.js";
 import {
@@ -35,8 +34,9 @@ class Message extends SnowFlake {
 	headers: Localuser["headers"];
 	embeds: Embed[] = [];
 	author!: User;
-	mentions: userjson[] = [];
-	mention_roles!: Role[];
+	mentions = new Set<string>();
+	mention_roles = new Set<string>();
+	mention_everyone!: boolean;
 	attachments: File[] = []; //probably should be its own class tbh, should be Attachments[]
 	message_reference?: {
 		guild_id: string;
@@ -47,20 +47,8 @@ class Message extends SnowFlake {
 	private timestamp!: number | string;
 	content!: MarkDown;
 	static del: Promise<void>;
-	static resolve: Function;
-	/*
-		weakdiv:WeakRef<HTMLDivElement>;
-			set div(e:HTMLDivElement){
-			if(!e){
-			this.weakdiv=null;
-			return;
-			}
-			this.weakdiv=new WeakRef(e);
-			}
-			get div(){
-			return this.weakdiv?.deref();
-			}
-			*/
+	static resolve: () => void;
+
 	private weakDiv?: WeakRef<HTMLDivElement>;
 	get div(): HTMLDivElement | undefined {
 		return this.weakDiv?.deref();
@@ -72,15 +60,21 @@ class Message extends SnowFlake {
 		}
 		this.weakDiv = new WeakRef(div);
 	}
-	member: Member | undefined;
+
+	member?: Member;
 	reactions: {
 		count: number;
 		emoji: emojijson;
 		me: boolean;
 	}[] = [];
-	pinned!: boolean;
+	pinned: boolean = false;
 	flags: number = 0;
 	poll?: polljson;
+	nonce: string = "";
+	components?: Components;
+	edited_timestamp: string | null = null;
+	thread?: Channel;
+
 	getTimeStamp() {
 		return new Date(this.timestamp).getTime();
 	}
@@ -356,7 +350,7 @@ class Message extends SnowFlake {
 		dio.options.addHTMLArea(div);
 		dio.show();
 	}
-	nonce: string = "";
+
 	setEdit() {
 		const prev = this.channel.editing;
 		this.channel.editing = this;
@@ -405,9 +399,7 @@ class Message extends SnowFlake {
 			},
 		);
 	}
-	components?: Components;
-	edited_timestamp: string | null = null;
-	thread?: Channel;
+
 	giveData(messagejson: messagejson) {
 		const func = this.channel.infinite.snapBottom();
 		for (const thing of Object.keys(messagejson)) {
@@ -424,7 +416,7 @@ class Message extends SnowFlake {
 				continue;
 			} else if (thing === "member") {
 				Member.new(messagejson.member as memberjson, this.guild).then((_) => {
-					this.member = _ as Member;
+					this.member = _;
 				});
 				continue;
 			} else if (thing === "embeds") {
@@ -433,7 +425,7 @@ class Message extends SnowFlake {
 					this.embeds[thing] = new Embed(messagejson.embeds[thing], this);
 				}
 				continue;
-			} else if (thing === "author") {
+			} else if (thing === "author" || thing === "mentions") {
 				continue;
 			} else if (thing === "sticker_items") {
 				this.stickers = (messagejson.sticker_items || []).map((_) => {
@@ -452,7 +444,7 @@ class Message extends SnowFlake {
 				}
 				this.thread = thread;
 				continue;
-			}
+			} else if (thing === "mention_roles") continue;
 			(this as any)[thing] = (messagejson as any)[thing];
 		}
 		this.stickers ||= [];
@@ -465,13 +457,15 @@ class Message extends SnowFlake {
 		if (messagejson.author.id) {
 			this.author = new User(messagejson.author, this.localuser, false);
 		}
-		if (messagejson.mentions) this.mentions = messagejson.mentions;
-
-		this.mention_roles = (messagejson.mention_roles || [])
-			.map((role: string | {id: string}) => {
-				return this.guild.roleids.get(role instanceof Object ? role.id : role);
-			})
-			.filter((_) => _ !== undefined);
+		this.mentions.clear();
+		if (messagejson.mentions)
+			messagejson.mentions.forEach((_) => {
+				new User(_, this.localuser);
+				this.mentions.add(_.id);
+			});
+		this.mention_roles.clear();
+		if (messagejson.mention_roles)
+			messagejson.mention_roles.forEach((id) => this.mention_roles.add(id));
 
 		if (!this.member && this.guild.id !== "@me") {
 			this.author.resolvemember(this.guild).then((_) => {
@@ -575,16 +569,16 @@ class Message extends SnowFlake {
 			console.error(e);
 		}
 	}
-	mention_everyone!: boolean;
+
 	mentionsuser(userd: User | Member) {
 		if (this.mention_everyone) return true;
 		if (userd instanceof User) {
-			return !!this.mentions.find(({id}) => id == userd.id);
+			return !!this.mentions.has(userd.id);
 		} else if (userd instanceof Member) {
-			if (!!this.mentions.find(({id}) => id == userd.id)) {
+			if (!!this.mentions.has(userd.id)) {
 				return true;
 			} else {
-				return !new Set(this.mention_roles).isDisjointFrom(new Set(userd.roles)); //if the message mentions a role the user has
+				return !this.mention_roles.isDisjointFrom(userd.roleIds); //if the message mentions a role the user has
 			}
 		} else {
 			return false;
@@ -1664,7 +1658,7 @@ class Message extends SnowFlake {
 	}
 	reactionAdd(data: {name: string; id?: string}, member: Member | {id: string}) {
 		for (const thing of this.reactions) {
-			if (thing.emoji.name === data.name || thing.emoji.id === data.id) {
+			if (thing.emoji.name === data.name || (thing.emoji.id === data.id && data.id)) {
 				thing.count++;
 				if (member.id === this.localuser.user.id) {
 					thing.me = true;
@@ -1673,7 +1667,6 @@ class Message extends SnowFlake {
 				return;
 			}
 		}
-		console.log(data, this.reactions);
 		this.reactions.push({
 			count: 1,
 			emoji: data,
@@ -1681,12 +1674,11 @@ class Message extends SnowFlake {
 		});
 		this.updateReactions();
 	}
-	reactionRemove(data: {name: string}, id: string) {
-		console.log("test");
+	reactionRemove(data: {name: string; id?: string}, id: string) {
 		for (const i in this.reactions) {
 			const thing = this.reactions[i];
 			console.log(thing, data);
-			if (thing.emoji.name === data.name) {
+			if (thing.emoji.name === data.name || (thing.emoji.id === data.id && data.id)) {
 				thing.count--;
 				if (thing.count === 0) {
 					this.reactions.splice(Number(i), 1);

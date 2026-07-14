@@ -181,17 +181,20 @@ class Guild extends SnowFlake {
 	roles!: Role[];
 	readonly roleids = new Map<string, Role>();
 	prevchannel: Channel | undefined;
-	banner!: string;
-	message_notifications!: number;
+	banner?: string;
+	message_notifications: number = 0;
 	headchannels!: Channel[];
 	position!: number;
 	parent_id!: string;
-	member!: Member;
+	get member() {
+		return this.members.get(this.localuser.user.id)!;
+	}
 	html!: HTMLElement;
 	emojis: emojipjson[] = [];
 	large!: boolean;
 	stickers = new Map<string, Sticker>();
-	members = new Set<Member>();
+	members = new Map<string, Member>();
+	welcomeScreen?: welcomeScreen;
 	static readonly contextmenu = new Contextmenu<Guild, void>("guild menu");
 	static setupcontextmenu() {
 		Guild.contextmenu.addButton(
@@ -551,7 +554,6 @@ class Guild extends SnowFlake {
 
 		dio.show();
 	}
-	welcomeScreen?: welcomeScreen;
 	generateSettings() {
 		const settings = new Settings(I18n.guild.settingsFor(this.properties.name));
 		const textChannels = this.channels.filter((e) => {
@@ -1449,13 +1451,7 @@ class Guild extends SnowFlake {
 		this.roleUpdate(role, 0);
 	}
 	memberupdate(json: memberjson) {
-		let member: undefined | Member = undefined;
-		for (const thing of this.members) {
-			if (thing.id === json.id) {
-				member = thing;
-				break;
-			}
-		}
+		let member = this.members.get(json.id);
 
 		if (!member) return;
 		member.update(json);
@@ -1524,16 +1520,13 @@ class Guild extends SnowFlake {
 		this.message_notifications = 0;
 		this.sortRoles();
 		if (member instanceof User) {
-			console.warn(member);
 			Member.resolveMember(member, this).then((_) => {
-				if (_) {
-					this.member = _;
-				} else {
+				if (!_) {
 					console.error("Member was unable to resolve");
 				}
 			});
 		} else {
-			this.member = Member.newUnsafe(member, this);
+			Member.new(member, this);
 		}
 
 		for (const thing of json.channels) {
@@ -1615,7 +1608,7 @@ class Guild extends SnowFlake {
 		});
 		full.show();
 	}
-	async leave() {
+	private async leave() {
 		return fetch(this.info.api + "/users/@me/guilds/" + this.id, {
 			method: "DELETE",
 			headers: this.headers,
@@ -1651,8 +1644,8 @@ class Guild extends SnowFlake {
 			}
 
 			console.log(position);
-			if (thing.move_id && thing.move_id !== thing.parent_id) {
-				thing.parent_id = thing.move_id;
+			if (thing.move_id && thing.move_id !== thing.parentId) {
+				thing.parentId = thing.move_id;
 				thisthing.parent_id = thing.parent?.id;
 				thing.move_id = undefined;
 			}
@@ -1813,7 +1806,7 @@ class Guild extends SnowFlake {
 		});
 		full.show();
 	}
-	async delete() {
+	private async delete() {
 		return fetch(this.info.api + "/guilds/" + this.id + "/delete", {
 			method: "POST",
 			headers: this.headers,
@@ -1869,7 +1862,7 @@ class Guild extends SnowFlake {
 				const channel = new Channel(channelJson as channeljson, this);
 				this.localuser.channels.set(channel.id, channel);
 				channel.resolveparent(this);
-				const par = this.localuser.channels.get(channel.parent_id as string);
+				const par = this.localuser.channels.get(channel.parentId as string);
 				par?.createguildHTML();
 			} else {
 				this.loadChannel();
@@ -1892,12 +1885,9 @@ class Guild extends SnowFlake {
 		const build = document.createElement("div");
 
 		for (const thing of this.headchannels) {
-			build.appendChild(thing.createguildHTML(this.isAdmin()));
+			build.appendChild(thing.createguildHTML(!this.member || this.member.isAdmin()));
 		}
 		return build;
-	}
-	isAdmin() {
-		return this.member.isAdmin();
 	}
 	async markAsRead() {
 		const build: {
@@ -1925,13 +1915,6 @@ class Guild extends SnowFlake {
 			headers: this.headers,
 			body: JSON.stringify(build),
 		});
-	}
-	hasRole(r: Role | string) {
-		console.log("this should run");
-		if (r instanceof Role) {
-			r = r.id;
-		}
-		return this.member.hasRole(r);
 	}
 	async loadChannel(ID?: string | undefined | null, addstate = true, message?: string) {
 		if (ID) {

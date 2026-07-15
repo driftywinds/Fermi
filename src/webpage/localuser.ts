@@ -69,7 +69,7 @@ interface MDSearchOption {
 
 MarkDown.emoji = Emoji;
 class Localuser {
-	badges = new Map<
+	readonly badges = new Map<
 		string,
 		{id: string; description: string; icon: string; link?: string; translate?: boolean}
 	>(badgeArr);
@@ -90,9 +90,9 @@ class Localuser {
 	readonly guilds = new Map<string, Guild>();
 	readonly channels: Map<string, Channel> = new Map();
 	readonly userMap: Map<string, User> = new Map();
-	messages = new Map<string, Message>();
-	idToPrev = new Map<string, string | undefined>();
-	idToNext = new Map<string, string | undefined>();
+	readonly messages = new Map<string, Message>();
+	readonly idToPrev = new Map<string, string | undefined>();
+	readonly idToNext = new Map<string, string | undefined>();
 	get status() {
 		return this.user.status;
 	}
@@ -369,7 +369,7 @@ class Localuser {
 		}
 	}
 	guildFolders: guildFolder[] = [];
-	unknownRead = new Map<string, readStateEntry>();
+	readonly unknownRead = new Map<string, readStateEntry>();
 	async gottenReady(ready: readyjson): Promise<void> {
 		await I18n.done;
 		this.errorBackoff = 0;
@@ -458,7 +458,7 @@ class Localuser {
 
 		this.pingEndpoint();
 	}
-	inrelation = new Set<User>();
+	readonly inrelation = new Set<User>();
 	outoffocus(): void {
 		const servers = document.getElementById("guildRail") as HTMLDivElement;
 		servers.innerHTML = "";
@@ -721,7 +721,7 @@ class Localuser {
 		await promise;
 		console.warn("huh");
 	}
-	interNonceMap = new Map<string, Message>();
+	readonly interNonceMap = new Map<string, Message>();
 	registerInterNonce(nonce: string, thing: Message) {
 		this.interNonceMap.set(nonce, thing);
 	}
@@ -737,7 +737,7 @@ class Localuser {
 			this.handleTrace(e.trace);
 		});
 	}
-	relChangeUpdateMap = new Map<string, (() => void)[]>();
+	readonly relChangeUpdateMap = new Map<string, (() => void)[]>();
 	async relationChange(id: string): Promise<void> {
 		const arr = this.relChangeUpdateMap.get(id) || [];
 		const {promise, resolve} = Promise.withResolvers<void>();
@@ -911,7 +911,7 @@ class Localuser {
 							divy,
 							document.getElementById("bottomseparator"),
 						);
-						guildy.message_notifications = guildy.properties.default_message_notifications;
+						guildy.messageNotifications = guildy.properties.default_message_notifications;
 						guildy.showWelcome();
 					})();
 					break;
@@ -1099,9 +1099,11 @@ class Localuser {
 				case "GUILD_STICKERS_UPDATE": {
 					const guild = this.guilds.get(temp.d.guild_id);
 					if (!guild) break;
-					guild.stickers = new Map(
-						temp.d.stickers.map((_) => [_.id, new Sticker(_, guild)] as const),
+					guild.stickers.clear();
+					temp.d.stickers.forEach((sticker) =>
+						guild.stickers.set(sticker.id, new Sticker(sticker, guild)),
 					);
+
 					guild.onStickerUpdate(guild.stickers);
 					break;
 				}
@@ -1412,14 +1414,17 @@ class Localuser {
 				return;
 			}
 			const counts = new Map<string, number>();
-			for (const thing of list.d.ops[0].items) {
-				if ("member" in thing) {
-					if (this.userMap.get(thing.member.id)?.members.has(guild)) continue;
-					await Member.new(thing.member, guild);
-				} else {
-					counts.set(thing.group.id, thing.group.count);
-				}
-			}
+			await Promise.all(
+				list.d.ops[0].items.map(async (member) => {
+					if ("member" in member) {
+						if (this.userMap.get(member.member.id)?.members.has(guild)) return;
+						if (this.focusGuild?.id && this.focusGuild?.id !== "@me")
+							await this.getMember(member.member.user!.id, this.focusGuild.id);
+					} else {
+						counts.set(member.group.id, member.group.count);
+					}
+				}),
+			);
 		}
 
 		const elms: Map<Role | "offline" | "online", (Member | User)[]> = new Map([]);
@@ -1490,7 +1495,7 @@ class Localuser {
 		console.log("failed with", insts, this.info.wellknown);
 		return this.info.wellknown;
 	}
-	roleListMap = new WeakMap<
+	readonly roleListMap = new WeakMap<
 		HTMLDivElement,
 		{
 			role: Role | "offline" | "online";
@@ -1797,7 +1802,7 @@ class Localuser {
 		channels.appendChild(html);
 		return guild;
 	}
-	dragMap = new WeakMap<
+	readonly dragMap = new WeakMap<
 		HTMLElement,
 		| Guild
 		| {
@@ -2832,7 +2837,7 @@ class Localuser {
 								}
 							},
 							{
-								fetchURL: this.info.api + "/users/@me/mfa/totp/enable/",
+								fetchURL: this.info.api + "/users/@me/mfa/totp/enable",
 								headers: this.headers,
 							},
 						);
@@ -3849,7 +3854,9 @@ class Localuser {
 		}
 		{
 			const instanceInfo = settings.addButton(I18n.instanceInfo.name());
-			fetch(this.info.api + "/policies/instance/")
+			fetch(this.info.api + "/policies/instance", {
+				headers: this.headers,
+			})
 				.then((_) => _.json())
 				.then((body) => {
 					const json = body as {
@@ -5036,7 +5043,7 @@ class Localuser {
 			[`BlobmojiCompat.${isFirefox ? "woff2" : "ttf"}`, "Blobmoji"],
 		] as const;
 	}
-	getMemberMap = new Map<string, Promise<Member | undefined>>();
+	readonly getMemberMap = new Map<string, Promise<Member | undefined>>();
 	async getMember(id: string, guildid: string): Promise<Member | undefined> {
 		const user = this.userMap.get(id);
 		const guild = this.guilds.get(guildid) as Guild;

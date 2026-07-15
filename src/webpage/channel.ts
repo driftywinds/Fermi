@@ -47,7 +47,7 @@ class Channel extends SnowFlake {
 	parentId?: string;
 	parent?: Channel;
 	children!: Channel[];
-	permissionOverwriteMap!: Map<string, Permissions>;
+	readonly permissionOverwriteMap = new Map<string, Permissions>();
 	permissionOverwriteOrder: string[] = [];
 	topic!: string;
 	nsfw!: boolean;
@@ -90,9 +90,9 @@ class Channel extends SnowFlake {
 	static contextmenu = new Contextmenu<Channel, undefined>("channel menu");
 	replyingto!: Message | null;
 	infinite!: InfiniteScroller;
-	idToPrev: Map<string, string | undefined>;
-	idToNext: Map<string, string | undefined>;
-	messages: Map<string, Message>;
+	readonly idToPrev: Map<string, string | undefined>;
+	readonly idToNext: Map<string, string | undefined>;
+	readonly messages: Map<string, Message>;
 	voice?: Voice;
 	bitrate: number = 128000;
 	threadData?: threadMetadata;
@@ -2868,7 +2868,7 @@ class Channel extends SnowFlake {
 	lastmessage: Message | undefined;
 	setnotifcation() {
 		const optionsArr = ["all", "onlyMentions", "none", "default"] as const;
-		const defualt = I18n.guild[optionsArr[this.guild.message_notifications]]();
+		const defualt = I18n.guild[optionsArr[this.guild.messageNotifications]]();
 		const options = optionsArr.map((e) => I18n.guild[e](defualt));
 		const notiselect = new Dialog("");
 		const form = notiselect.options.addForm(
@@ -3234,14 +3234,14 @@ class Channel extends SnowFlake {
 		}
 
 		const oldover = this.permissionOverwriteMap;
-		this.permissionOverwriteMap = new Map();
+		this.permissionOverwriteMap.clear();
 		this.permissionOverwriteOrder = (json.permission_overwrites ?? []).map((r) => {
 			const p = new Permissions(r.allow, r.deny);
 			this.permissionOverwriteMap.set(r.id, p);
 			return r.id;
 		});
-		const nchange = [...new Set<string>().union(oldover).difference(this.permissionOverwriteMap)];
-		const pchange = [...new Set<string>().union(this.permissionOverwriteMap).difference(oldover)];
+		const nchange = new Set<string>(oldover.keys()).difference(this.permissionOverwriteMap);
+		const pchange = new Set<string>(this.permissionOverwriteMap.keys()).difference(oldover);
 		for (const thing of nchange) {
 			const role = this.guild.roleids.get(thing);
 			if (role) {
@@ -3265,7 +3265,6 @@ class Channel extends SnowFlake {
 				});
 			}
 		}
-		console.log(pchange, nchange);
 		this.topic = json.topic;
 		this.nsfw = json.nsfw;
 		this.fireEvents();
@@ -3284,7 +3283,7 @@ class Channel extends SnowFlake {
 	get trueNotiValue() {
 		const val = this.notification;
 		if (val === "default") {
-			switch (Number(this.guild.message_notifications)) {
+			switch (Number(this.guild.messageNotifications)) {
 				case 0:
 					return "all";
 				case 1:
@@ -3303,7 +3302,7 @@ class Channel extends SnowFlake {
 		if (Number(notinumber) === 3) {
 			notinumber = null;
 		}
-		notinumber ??= this.guild.message_notifications;
+		notinumber ??= this.guild.messageNotifications;
 		console.warn("info:", notinumber);
 		switch (Number(notinumber)) {
 			case 0:
@@ -3872,6 +3871,7 @@ class Channel extends SnowFlake {
 
 		if (messagez.author === this.localuser.user) {
 			this.lastSentMessage = messagez;
+			this.lastreadmessageid = messagez.id;
 			this.slowmode();
 			this.mentions = 0;
 			this.unreads();

@@ -1223,6 +1223,8 @@ class MarkDown {
 		}
 		if (URL.canParse(url)) {
 			const Url = new URL(url);
+			const trusted = ["http:", "https:"];
+			if (!trusted.includes(Url.protocol)) return;
 			if (localuser) {
 				const [_, _2, ...path] = Url.pathname.split("/");
 

@@ -159,58 +159,70 @@ class PermissionToggle implements OptionsElement<number> {
 	watchForChange() {}
 	generateHTML(): HTMLElement {
 		const div = document.createElement("div");
-		div.classList.add("setting");
+		const descDiv = document.createElement("div");
+		div.classList.add("setting", "flexltr", "roleSettings");
 		const name = document.createElement("span");
 		name.textContent = this.rolejson.readableName;
 		name.classList.add("settingsname");
-		div.append(name);
+		descDiv.append(name);
 
-		div.append(this.generateCheckbox());
+		div.append(descDiv, this.generateCheckbox());
 		const p = document.createElement("p");
 		p.textContent = this.rolejson.description;
-		div.appendChild(p);
+		descDiv.appendChild(p);
+
 		return div;
 	}
 	generateCheckbox(): HTMLElement {
-		const rand = Math.random() + "";
 		const div = document.createElement("div");
 		div.classList.add("tritoggle");
 		const state = this.permissions.getPermission(this.rolejson.name);
+		let cur = document.createElement("span");
+		function switchCur(newCur: HTMLSpanElement) {
+			cur.classList.remove("selected");
+			cur = newCur;
+			cur.classList.add("selected");
+		}
 
-		const on = document.createElement("input");
-		on.type = "radio";
-		on.name = this.rolejson.name + rand;
+		const on = document.createElement("span");
 		div.append(on);
+		on.classList.add("triOpt");
 		if (state === 1) {
-			on.checked = true;
+			cur = on;
+			on.classList.add("selected");
 		}
 		on.onclick = (_) => {
 			this.permissions.setPermission(this.rolejson.name, 1);
 			this.owner.changed();
+			switchCur(on);
 		};
 
-		const no = document.createElement("input");
-		no.type = "radio";
-		no.name = this.rolejson.name + rand;
+		const no = document.createElement("span");
+		no.classList.add("triOpt");
+
 		div.append(no);
 		if (state === 0) {
-			no.checked = true;
+			cur = no;
+			no.classList.add("selected");
 		}
 		no.onclick = (_) => {
 			this.permissions.setPermission(this.rolejson.name, 0);
 			this.owner.changed();
+			switchCur(no);
 		};
 		if (this.permissions.hasDeny) {
-			const off = document.createElement("input");
-			off.type = "radio";
-			off.name = this.rolejson.name + rand;
+			const off = document.createElement("span");
+
 			div.append(off);
+			off.classList.add("triOpt");
 			if (state === -1) {
-				off.checked = true;
+				cur = off;
+				off.classList.add("selected");
 			}
 			off.onclick = (_) => {
 				this.permissions.setPermission(this.rolejson.name, -1);
 				this.owner.changed();
+				switchCur(off);
 			};
 		}
 		return div;
@@ -223,7 +235,7 @@ class RoleList extends Buttons {
 	permission: Permissions;
 	readonly guild: Guild;
 	readonly channel: false | Channel;
-	declare buttons: [string, string][];
+	declare buttons: {name: string; inner: string}[];
 	readonly options: Options;
 	onchange: (id: string, perms: Permissions) => void;
 	curid?: string;
@@ -264,7 +276,7 @@ class RoleList extends Buttons {
 			});
 		}
 		for (const i of permissions) {
-			this.buttons.push([i[0].name, i[0].id]);
+			this.buttons.push({name: i[0].name, inner: i[0].id});
 		}
 		this.options = options;
 		guild.roleUpdate = this.groleUpdate.bind(this);
@@ -516,7 +528,7 @@ class RoleList extends Buttons {
 			return b.position - a.position;
 		});
 		for (const i of this.permissions) {
-			this.buttons.push([i[0].name, i[0].id]);
+			this.buttons.push({name: i[0].name, inner: i[0].id});
 		}
 		if (!this.buttonList) return;
 		const elms = Array.from(this.buttonList.children);
@@ -641,16 +653,16 @@ class RoleList extends Buttons {
 		roleRow.append(add);
 
 		buttonTable.append(roleRow);
-		for (const thing of this.buttons) {
+		for (const {name, inner} of this.buttons) {
 			const button = document.createElement("button");
 
-			this.buttonMap.set(thing[0], button);
+			this.buttonMap.set(name, button);
 			button.classList.add("SettingsButton");
 			const span = document.createElement("span");
-			span.textContent = thing[0];
+			span.textContent = name;
 			button.append(span);
 			span.classList.add("roleButtonStyle");
-			const role = this.guild.roleids.get(thing[1]) || this.guild.localuser.userMap.get(thing[1]);
+			const role = this.guild.roleids.get(inner) || this.guild.localuser.userMap.get(inner);
 			if (role) {
 				if (role instanceof Role) {
 					if (role.getColor()) button.style.setProperty("--user-bg", `var(--role-${role.id})`);
@@ -675,7 +687,7 @@ class RoleList extends Buttons {
 			}
 			button.onclick = (_) => {
 				html.classList.remove("mobileHidden");
-				this.generateHTMLArea(thing[1], html);
+				this.generateHTMLArea(inner, html);
 				if (this.warndiv) {
 					this.warndiv.remove();
 				}

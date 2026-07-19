@@ -457,6 +457,13 @@ class Localuser {
 		}
 
 		this.pingEndpoint();
+		const prefs = await getPreferences();
+		const ml = document.getElementById("memberlisttoggle")!;
+		if (prefs.checkMemberList) {
+			ml.classList = "";
+		} else {
+			ml.classList = "svgicon svg-friends";
+		}
 	}
 	readonly inrelation = new Set<User>();
 	outoffocus(): void {
@@ -2038,7 +2045,7 @@ class Localuser {
 				folder.name = name.value;
 				folder.color = +("0x" + (color.value || "#0").split("#")[1]);
 				icon.style.setProperty("--folder-color", "#" + folder.color.toString(16).padStart(6, "0"));
-				if (!folder.color) icon.style.removeProperty("--folder-color");
+				if (!folder.color && folder.color !== 0) icon.style.removeProperty("--folder-color");
 				await this.saveGuildOrder();
 				dio.hide();
 			});
@@ -2048,7 +2055,7 @@ class Localuser {
 		menu.bindContextmenu(iconDiv);
 		if (folder.color !== null && folder.color !== undefined) {
 			icon.style.setProperty("--folder-color", "#" + folder.color.toString(16).padStart(6, "0"));
-			if (!folder.color) icon.style.removeProperty("--folder-color");
+			if (!folder.color && folder.color !== 0) icon.style.removeProperty("--folder-color");
 		}
 		iconDiv.append(icon);
 		const divy = document.createElement("div");
@@ -3119,6 +3126,22 @@ class Localuser {
 					{initState: cur},
 				);
 			}
+			visuals.addCheckboxInput(
+				I18n.checkBoxMemberList(),
+				(c) => {
+					prefs.checkMemberList = c;
+					const ml = document.getElementById("memberlisttoggle")!;
+					if (c) {
+						ml.classList = "";
+					} else {
+						ml.classList = "svgicon svg-friends";
+					}
+					setPreferences(prefs);
+				},
+				{
+					initState: !!prefs.checkMemberList,
+				},
+			);
 		}
 		{
 			const animations = settings.addButton(I18n.accessibility.animations(), {contained: true});

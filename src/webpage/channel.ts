@@ -56,12 +56,16 @@ class Channel extends SnowFlake {
 	get lastreadmessageid() {
 		return this.lastreadmessageidint;
 	}
-	async getOverwrites(): Promise<[User | Role, Permissions][]> {
+	async getOverwrites(): Promise<[User | Role | {id: string}, Permissions][]> {
 		return await Promise.all(
 			[...this.permissionOverwriteMap].map(async ([id, p]) => {
 				const role = this.guild.roleids.get(id);
 				if (role) return [role, p] as const;
-				return [await this.localuser.getUser(id), p] as const;
+				try {
+					return [await this.localuser.getUser(id), p] as const;
+				} catch {
+					return [{id}, p] as const;
+				}
 			}),
 		);
 	}
@@ -222,11 +226,7 @@ class Channel extends SnowFlake {
 			},
 			{
 				visible: function () {
-					return (
-						this.hasPermission("MANAGE_CHANNELS") ||
-						this.owner_id === this.localuser.user.id ||
-						true
-					);
+					return this.hasPermission("MANAGE_CHANNELS") || this.owner_id === this.localuser.user.id;
 				},
 				icon: {
 					css: "svg-settings",
@@ -581,7 +581,9 @@ class Channel extends SnowFlake {
 			const s1 = settings.addButton(I18n.channel.permissions(), {optName: ""});
 
 			(async () => {
+				console.log("Here");
 				const list = await this.getOverwrites();
+				console.log("here 2");
 
 				s1.options.push(
 					new RoleList(list, this.guild, this.updateRolePermissions.bind(this), this),
@@ -1551,6 +1553,7 @@ class Channel extends SnowFlake {
 			const buttons = options.addOptions("", {ltr: true});
 			buttons.addButtonInput("", "Yes", () => {
 				this.perminfo.nsfwOk = true;
+				this.localuser.focusChannel = undefined;
 				this.getHTML();
 			});
 			buttons.addButtonInput("", "No", () => {

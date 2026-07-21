@@ -1454,7 +1454,6 @@ class Localuser {
 			}
 			if (!channel.hasPermission("VIEW_CHANNEL", member)) {
 				members.delete(member);
-				console.log(member, "can't see");
 				return;
 			}
 		});
@@ -4180,6 +4179,17 @@ class Localuser {
 			Bot.InviteMaker(appId, form, this.info);
 		});
 	}
+	updateSend() {
+		const typebox = document.getElementById("typebox") as CustomHTMLDivElement;
+		if (
+			(typebox.markdown.rawString && typebox.markdown.rawString !== "\n") ||
+			document.getElementById("pasteimage")?.children.length
+		) {
+			typebox.parentElement!.classList.remove("noConent");
+		} else {
+			typebox.parentElement!.classList.add("noConent");
+		}
+	}
 	//TODO make this an option
 	readonly autofillregex = Object.freeze(/(^|\s|\n)[@#:]([a-zA-Z0-9]*)$/i);
 	mdBox() {
@@ -4188,11 +4198,7 @@ class Localuser {
 		typeMd.owner = this;
 		typeMd.onUpdate = (str, pre) => {
 			this.search(document.getElementById("searchOptions") as HTMLDivElement, typeMd, str, pre);
-			if (str && str !== "\n") {
-				typebox.parentElement!.classList.remove("noConent");
-			} else {
-				typebox.parentElement!.classList.add("noConent");
-			}
+			this.updateSend();
 		};
 	}
 	async pinnedClick(rect: DOMRect) {
@@ -4667,14 +4673,16 @@ class Localuser {
 			typebox,
 		);
 	}
+	private MDGenID = 0;
 	MDFindMention(name: string, original: string, box: HTMLDivElement, typebox: MarkDown) {
 		if (this.ws && this.focusGuild) {
+			const id = ++this.MDGenID;
 			this.MDFineMentionGen(name, original, box, typebox);
 			if (this.focusGuild.member_count <= this.focusGuild.members.size) return;
 			if (this.focusGuild.id !== "@me") {
 				this.focusGuild.searchMembers(8, name).then(async () => {
 					if (!typebox.rawString.startsWith(original)) return;
-					this.MDFineMentionGen(name, original, box, typebox);
+					if (this.MDGenID === id) this.MDFineMentionGen(name, original, box, typebox);
 				});
 			}
 		}

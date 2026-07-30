@@ -337,7 +337,7 @@ class Localuser {
 	}
 	async queryBlog() {
 		this.perminfo.localuser ??= {};
-		const prefs = await getPreferences();
+		const prefs = getPreferences();
 		const bstate = prefs.showBlogUpdates;
 		if (bstate === undefined) {
 			const pop = new Dialog("");
@@ -461,7 +461,7 @@ class Localuser {
 		}
 
 		this.pingEndpoint();
-		const prefs = await getPreferences();
+		const prefs = getPreferences();
 		const ml = document.getElementById("memberlisttoggle")!;
 		if (prefs.checkMemberList) {
 			ml.classList = "";
@@ -2483,7 +2483,6 @@ class Localuser {
 	async getPosts() {
 		const text = await (await fetch("https://blog.fermi.chat/feed_rss_created.xml")).text();
 		const xml = new DOMParser().parseFromString(text, "text/xml");
-		console.log(xml, text);
 		const posts = Array.from(xml.getElementsByTagName("channel")[0].getElementsByTagName("item"));
 		return {
 			items: posts.map((post) => {
@@ -2531,7 +2530,7 @@ class Localuser {
 		this.figureDefaultProvidor();
 	}
 	async figureDefaultProvidor() {
-		const prefs = await getPreferences();
+		const prefs = getPreferences();
 		this.selectedGifProfidor =
 			this.gifProvideors.find((_) => _.api_name == prefs.gifProvidor) || this.gifProvideors[0];
 	}
@@ -2583,7 +2582,7 @@ class Localuser {
 		});
 	}
 	async showusersettings() {
-		const prefs = await getPreferences();
+		const prefs = getPreferences();
 		const localSettings = getLocalSettings();
 		const settings = new Settings(I18n.localuser.settings());
 		{
@@ -2778,21 +2777,20 @@ class Localuser {
 
 								connectionContainer.appendChild(container);
 							});
-						//TODO enable this once domain verification is ready within Harmony
-						if (false as true) {
-							const container = document.createElement("div");
 
-							const span = document.createElement("span");
-							span.classList.add("conImg", "svgicon");
-							span.style.setProperty("mask", `url("/icons/domain.svg")`);
-							container.append(span);
+						const container = document.createElement("div");
 
-							container.addEventListener("click", async () => {
-								this.domainVerification();
-							});
+						const span = document.createElement("span");
+						span.classList.add("conImg", "svgicon");
+						span.style.setProperty("mask", `url("/icons/domain.svg")`);
+						container.append(span);
 
-							connectionContainer.appendChild(container);
-						}
+						container.addEventListener("click", async () => {
+							this.domainVerification();
+						});
+
+						connectionContainer.appendChild(container);
+
 						serverConnections
 							.filter((_) => actConMap.has(_))
 							.forEach((_) => {
@@ -3014,7 +3012,7 @@ class Localuser {
 		}
 
 		{
-			const prefs = await getPreferences();
+			const prefs = getPreferences();
 			const tas = settings.addButton(I18n.localuser.themesAndSounds(), {contained: true});
 			{
 				const themes = ["Dark", "WHITE", "Light", "Dark-Accent"];
@@ -3143,6 +3141,18 @@ class Localuser {
 					},
 					this.gifProvideors.map((_) => _.name),
 					{defaultIndex: ind === -1 ? 0 : ind},
+				);
+			}
+			{
+				tas.addCheckboxInput(
+					"Show today at:",
+					(b) => {
+						prefs.showToday = b;
+						setPreferences(prefs);
+					},
+					{
+						initState: prefs.showToday,
+					},
 				);
 			}
 		}
@@ -5236,7 +5246,7 @@ class Localuser {
 	readonly presences: Map<string, presencejson> = new Map();
 	static font?: FontFace;
 	static async loadFont() {
-		const prefs = await getPreferences();
+		const prefs = getPreferences();
 		const fontName = prefs.emojiFont;
 
 		if (this.font) {

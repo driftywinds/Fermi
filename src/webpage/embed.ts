@@ -69,6 +69,7 @@ class Embed {
 			case "link":
 				return this.generateLink();
 			case "video":
+				return this.generateVideo();
 			case "article":
 				return this.generateArticle();
 			default:
@@ -397,6 +398,8 @@ class Embed {
 			div.append(button);
 			button.onclick = (_) => {
 				if (this.localuser.info.api.startsWith(info.api)) {
+					button.textContent = I18n.invite.joining();
+					button.disabled = true;
 					fetch(this.localuser.info.api + "/invites/" + json.code, {
 						method: "POST",
 						headers: this.localuser.headers,
@@ -405,6 +408,10 @@ class Embed {
 						.then((_) => {
 							if (_.message) {
 								alert(_.message);
+								button.textContent = I18n.invite.accept();
+								button.disabled = false;
+							} else {
+								button.textContent = I18n.invite.alreadyJoined();
 							}
 						});
 				} else {
@@ -420,6 +427,132 @@ class Embed {
 		})();
 		return div;
 	}
+	generateVideo() {
+		const videoUrl =
+			this.json.video?.proxy_url ||
+			this.json.video?.url ||
+			(this.json.url && /\.(mp4|webm|mov|m4v|ogv)$/i.test(this.json.url)
+				? this.json.url
+				: undefined);
+
+		if (!this.json.title && !this.json.description && !this.json.provider && videoUrl) {
+			const div = document.createElement("div");
+			div.classList.add("messageimgdiv");
+			const video = document.createElement("video");
+			video.controls = true;
+			video.preload = "metadata";
+			video.src = videoUrl;
+			video.classList.add("messageimg");
+			if (this.json.video?.width) {
+				let scale = 1;
+				const max = 96 * 3;
+				scale = Math.max(scale, this.json.video.width / max);
+				scale = Math.max(scale, (this.json.video.height || 360) / max);
+				const width = this.json.video.width / scale;
+				const height = (this.json.video.height || 360) / scale;
+				video.style.width = width + "px";
+				video.style.height = height + "px";
+			} else {
+				video.style.maxWidth = "400px";
+				video.style.maxHeight = "300px";
+			}
+			div.append(video);
+			return div;
+		}
+
+		const colordiv = document.createElement("div");
+		colordiv.style.backgroundColor = "#000000";
+		colordiv.classList.add("embed-color");
+
+		const div = document.createElement("div");
+		div.classList.add("embed");
+
+		if (this.json.provider) {
+			const provider = document.createElement("p");
+			provider.classList.add("provider");
+			provider.textContent = this.json.provider.name;
+			div.append(provider);
+		}
+		if (this.json.title) {
+			const a = document.createElement("a");
+			if (this.json.url) {
+				MarkDown.safeLink(a, this.json.url);
+			}
+			a.textContent = this.json.title;
+			a.classList.add("embedtitle");
+			div.append(a);
+		}
+		if (this.json.description) {
+			const description = document.createElement("p");
+			description.textContent = this.json.description;
+			div.append(description);
+		}
+		let width = 96 * 4 + "px",
+			height = 96 * 3 + "px";
+		if (this.json.thumbnail.width && this.json.thumbnail.height) {
+			let scale = 1;
+			const inch = 96;
+			scale = Math.max(scale, this.json.thumbnail.width / inch / 4);
+			scale = Math.max(scale, this.json.thumbnail.height / inch / 3);
+			this.json.thumbnail.width /= scale;
+			this.json.thumbnail.height /= scale;
+			this.json.thumbnail.width |= 0;
+			this.json.thumbnail.height |= 0;
+			width = this.json.thumbnail.width + "px";
+			height = this.json.thumbnail.height + "px";
+		}
+		const makeVideo = () => {
+			if (!videoUrl) return;
+			const video = document.createElement("video");
+			video.controls = true;
+			video.preload = "metadata";
+			video.src = videoUrl;
+			video.classList.add("bigembedimg");
+			video.style.width = width;
+			video.style.height = height;
+
+			return video;
+		};
+		if (this.json.thumbnail) {
+			const img = document.createElement("img");
+			img.classList.add("bigembedimg");
+			img.src = this.json.thumbnail.proxy_url || this.json.thumbnail.url;
+			div.append(img);
+			img.style.maxWidth = width;
+			img.style.maxHeight = height;
+
+			img.onclick = async () => {
+				if (this.json.video) {
+					const url = new URL(this.json.video.url);
+					if (!(url.protocol === "http:" || url.protocol === "https:")) return;
+					img.remove();
+					if (
+						url.host !== "youtube.com" &&
+						url.host !== "youtu.be" &&
+						url.host !== "www.youtube.com"
+					) {
+						const vid = makeVideo();
+						if (vid) div.append(vid);
+						return;
+					}
+
+					const iframe = document.createElement("iframe");
+					iframe.src = this.json.video.url + "?autoplay=1";
+
+					iframe.style.width = width;
+					iframe.style.height = height;
+
+					div.append(iframe);
+				}
+			};
+		} else {
+			const vid = makeVideo();
+			if (vid) div.append(vid);
+		}
+
+		colordiv.append(div);
+		return colordiv;
+	}
 	generateArticle() {
 		const colordiv = document.createElement("div");
 		colordiv.style.backgroundColor = "#000000";
@@ -433,10 +566,12 @@ class Embed {
 			provider.textContent = this.json.provider.name;
 			div.append(provider);
 		}
-		const a = document.createElement("a");
-		if (this.json.url && this.json.url) {
-			MarkDown.safeLink(a, this.json.url);
-			a.textContent = this.json.title || this.json.url;
+		if (this.json.title) {
+			const a = document.createElement("a");
+			if (this.json.url) {
+				MarkDown.safeLink(a, this.json.url);
+			}
+			a.textContent = this.json.title;
 			a.classList.add("embedtitle");
 			div.append(a);
 		}
@@ -458,30 +593,14 @@ class Embed {
 				img.style.height = this.json.thumbnail.height + "px";
 			}
 			img.classList.add("bigembedimg");
-			if (this.json.video) {
-				img.onclick = async () => {
-					if (this.json.video) {
-						const url = new URL(this.json.video.url);
-						if (!(url.protocol === "http:" || url.protocol === "https:")) return;
-						if (url.host !== "youtube.com") return;
-						img.remove();
-						const iframe = document.createElement("iframe");
-						iframe.src = this.json.video.url + "?autoplay=1";
-						if (this.json.thumbnail.width && this.json.thumbnail.height) {
-							iframe.style.width = this.json.thumbnail.width + "px";
-							iframe.style.height = this.json.thumbnail.height + "px";
-						}
-						div.append(iframe);
-					}
-				};
-			} else {
-				img.onclick = async () => {
-					const full = new ImagesDisplay([
-						new File({id: "", filename: "", url: img.src, size: -1, content_type: "image/"}, null),
-					]);
-					full.show();
-				};
-			}
+
+			img.onclick = async () => {
+				const full = new ImagesDisplay([
+					new File({id: "", filename: "", url: img.src, size: -1, content_type: "image/"}, null),
+				]);
+				full.show();
+			};
+
 			img.src = this.json.thumbnail.proxy_url || this.json.thumbnail.url;
 			div.append(img);
 		}

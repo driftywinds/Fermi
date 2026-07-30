@@ -4,6 +4,7 @@ import {ImagesDisplay} from "./disimg.js";
 import {makePlayBox, MediaPlayer} from "./media.js";
 import {I18n} from "./i18n.js";
 import {createImg} from "./utils/utils.js";
+import {Contextmenu} from "./contextmenu.js";
 class File {
 	readonly owner: Message | null;
 	id: string;
@@ -15,6 +16,22 @@ class File {
 	url: string;
 	size: number;
 	files?: File[];
+	static menu = this.makeMenu();
+	static makeMenu() {
+		const menu = new Contextmenu<File, void>("", true);
+		I18n.done.then(() => {
+			menu.addButton(
+				I18n.copyMedia(),
+				function () {
+					navigator.clipboard.writeText(this.url);
+				},
+				{
+					group: "copyLink",
+				},
+			);
+		});
+		return menu;
+	}
 	constructor(fileJSON: filejson, owner: Message | null) {
 		this.owner = owner;
 		this.id = fileJSON.id;
@@ -128,6 +145,7 @@ class File {
 					div.append(makeSpoilerHTML());
 				}
 			}
+			File.menu.bindContextmenu(div, this);
 			return div;
 		} else if (this.content_type.startsWith("video/")) {
 			const video = document.createElement("video");
@@ -150,18 +168,21 @@ class File {
 				div.append(video, makeSpoilerHTML());
 				return div;
 			}
+			File.menu.bindContextmenu(video, this);
 			return video;
 		} else if (this.content_type.startsWith("audio/") || this.content_type === "application/ogg") {
 			const a = this.getAudioHTML(url);
 			if (OSpoiler) {
 				a.append(makeSpoilerHTML());
 			}
+			File.menu.bindContextmenu(a, this);
 			return a;
 		} else {
 			const uk = this.createunknown(url);
 			if (OSpoiler) {
 				uk.append(makeSpoilerHTML());
 			}
+			File.menu.bindContextmenu(uk, this);
 			return uk;
 		}
 	}
@@ -255,16 +276,15 @@ class File {
 	createunknown(url: Promise<string> | void): HTMLElement {
 		console.log("🗎");
 		const src = this.proxy_url || this.url;
-		const div = document.createElement("table");
-		div.classList.add("unknownfile");
-		const nametr = document.createElement("tr");
-		div.append(nametr);
+		const div = document.createElement("div");
+		div.classList.add("unknownfile", "flexltr");
 		const fileicon = document.createElement("td");
-		nametr.append(fileicon);
+		div.append(fileicon);
 		fileicon.append("🗎");
 		fileicon.classList.add("fileicon");
 		fileicon.rowSpan = 2;
-		const nametd = document.createElement("td");
+		const nametd = document.createElement("div");
+		nametd.classList.add("flexttb");
 		if (src) {
 			const a = document.createElement("a");
 			a.href = src;
@@ -279,7 +299,7 @@ class File {
 		}
 
 		nametd.classList.add("filename");
-		nametr.append(nametd);
+		div.append(nametd);
 		const sizetr = document.createElement("tr");
 		const size = document.createElement("td");
 		sizetr.append(size);

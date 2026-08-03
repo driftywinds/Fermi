@@ -1058,10 +1058,12 @@ textarea {
 	right: 5px;
 	transition: top 0.2s;
 	transition-timing-function: ease-in;
-	background: white;
+	backdrop-filter: blur(20px);
+	mix-blend-mode: difference;
+	background: #969696;
 	cursor: pointer;
 	&.favorited {
-		background: yellow;
+		background: orange;
 	}
 }
 .visually-hidden {
@@ -2562,7 +2564,7 @@ span.instanceStatus {
 	flex-shrink: 1;
 	text-wrap: auto;
 	overflow-y: auto;
-	word-break: break-all;
+	word-break: break-word;
 	margin-right: 0.03in;
 	padding: 10px 0;
 }

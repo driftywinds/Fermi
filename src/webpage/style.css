@@ -1310,7 +1310,7 @@ textarea {
 	position: absolute;
 	right: 10px;
 	top: 10px;
-	background: #0000009e;
+	background: var(--secondary-bg);
 	padding: 6px;
 	border-radius: 100%;
 	cursor: pointer;
@@ -2088,6 +2088,7 @@ span.instanceStatus {
 	align-items: start;
 	padding-top: 10px;
 	background-size: cover;
+	color: white;
 	.ellipsis {
 		text-shadow: 0px 0px 8px black;
 	}
@@ -3123,6 +3124,24 @@ span .quote:last-of-type .quoteline {
 .mentionMD:hover::before {
 	background: var(--mention);
 }
+
+.smallemoji {
+	height: auto;
+	width: auto;
+	max-height: 1.25em;
+	max-width: 1.25em;
+	vertical-align: middle;
+}
+.bigemoji {
+	width: 0.6in;
+	object-fit: contain;
+	height: 0.6in;
+	vertical-align: middle;
+}
+.bigemojiUni {
+	font-size: 47px;
+}
+
 .reactiondiv {
 	padding-left: 52px;
 	gap: 0 4px;
@@ -3130,7 +3149,8 @@ span .quote:last-of-type .quoteline {
 	user-select: none;
 }
 .reaction {
-	min-width: 30px;
+	min-width: 1.25em;
+	min-height: 1.25em;
 	padding: 3px 4px;
 	margin-top: 4px;
 	background: var(--reaction-bg);
@@ -3141,6 +3161,7 @@ span .quote:last-of-type .quoteline {
 	align-items: center;
 	cursor: pointer;
 	gap: 4px;
+	font-size: 1.25em;
 }
 .reaction p {
 	line-height: 1em;
@@ -3151,12 +3172,6 @@ span .quote:last-of-type .quoteline {
 .reaction.meReacted {
 	background: var(--reaction-reacted-bg);
 	border-color: color-mix(in srgb, var(--accent-color), transparent);
-}
-.smallemoji {
-	height: auto;
-	width: auto;
-	max-height: 16px;
-	max-width: 16px;
 }
 
 /* Message External */
@@ -3388,33 +3403,34 @@ img.bigembedimg {
 	}
 }
 ::highlight(highkeyword) {
-	color: yellow;
+	color: var(--code-keyword);
 }
 ::highlight(highnumber) {
-	color: orange;
+	color: var(--code-number);
 }
 ::highlight(highstring) {
-	color: red;
+	color: var(--code-string);
 }
 ::highlight(highsymbol) {
-	color: white;
+	color: var(--primary-text-prominent);
 	font-weight: bold;
 }
 ::highlight(highcomment) {
-	color: green;
+	color: var(--code-comment);
 }
 ::highlight(highidentifier) {
-	color: white;
+	color: var(--primary-text);
 }
 ::highlight(highClass) {
-	color: #6741ff;
+	color: var(--code-class);
 }
 ::highlight(highProp) {
-	color: #33dcff;
+	color: var(--code-prop);
 }
 ::highlight(highFunc) {
-	color: #d564ff;
+	color: var(--code-func);
 }
+
 #memberlisttoggle.svgicon {
 	-moz-appearance: initial;
 	&::before {
@@ -4937,14 +4953,6 @@ fieldset input[type="radio"] {
 .friendsbutton {
 	transition: background-color 0.2s;
 	padding: 0.08in;
-}
-.bigemoji {
-	width: 0.6in;
-	object-fit: contain;
-	height: 0.6in;
-}
-.bigemojiUni {
-	font-size: 47px;
 }
 .friendlyButton {
 	padding: 0.07in;

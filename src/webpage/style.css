@@ -7,6 +7,7 @@ body {
 	color: var(--primary-text);
 	overflow: hidden; /* avoid "bounce" */
 	-webkit-text-size-adjust: 100%;
+	scrollbar-color: var(--button-bg) var(--primary-bg);
 }
 #page {
 	height: 100svh;
@@ -2881,12 +2882,13 @@ span.instanceStatus {
 	background: color-mix(in srgb, var(--accent-color) 75%, transparent) !important;
 	font-size: 0.75em !important;
 	font-weight: bold;
-	color: var(--primary-text-prominent) !important;
+	color: white !important;
 	border-radius: 4px;
 	flex: none;
 	width: fit-content;
 	background-clip: border-box !important;
 	align-self: center;
+	vertical-align: center;
 }
 .membererror {
 	display: inline-block;
@@ -3102,11 +3104,11 @@ span .quote:last-of-type .quoteline {
 	aspect-ratio: 1.9;
 }
 .mentionMD {
-	color: transparent;
 	background-clip: text;
 	padding: 1px 2px;
 	border-radius: 4px;
 	cursor: pointer;
+	color: color-mix(in srgb, var(--userbg) 75%, var(--primary-text));
 	background-image: var(--userbg, linear-gradient(var(--primary-text), var(--primary-text)));
 	position: relative;
 	z-index: 1;
@@ -3333,7 +3335,7 @@ img.bigembedimg {
 
 /* Sidebar */
 #sideContainDiv {
-	padding: 16px 8px;
+	padding: 16px 8px 0px 8px;
 	display: none;
 	flex: none;
 	width: 240px;
@@ -5017,14 +5019,15 @@ fieldset input[type="radio"] {
 .gifPreviewBox {
 	position: relative;
 	width: 2in;
+	height: 1in;
 	margin-bottom: 10px;
 	border-radius: 7px;
 	overflow: hidden;
 	cursor: pointer;
 
 	img {
-		width: 2in;
-		height: 1in;
+		width: 100%;
+		height: 100%;
 		object-fit: cover;
 	}
 	span {
@@ -5036,8 +5039,9 @@ fieldset input[type="radio"] {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		background: color-mix(in srgb, var(--card-bg) 60%, transparent);
 		font-weight: bold;
+		color: white;
+		background: color-mix(in srgb, black 50%, transparent);
 	}
 }
 .gifbox {
@@ -5283,7 +5287,7 @@ img.error::after {
 	background: transparent;
 	width: 48px;
 	height: 48px;
-	img {
+	.pfpDiv {
 		width: 24px;
 		height: 24px;
 		&:nth-child(1) {

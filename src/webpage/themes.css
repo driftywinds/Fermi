@@ -22,8 +22,8 @@
 	--code-func: #d564ff;
 }
 
-/* Themes. See themes.txt */
-.Dark-theme {
+/* Default theme that looks "just about grey" */
+.no-theme {
 	color-scheme: dark;
 	--primary-button-bg: color-mix(in srgb, #777777 10%, var(--accent-color));
 	--primary-bg: #303339;
@@ -44,28 +44,6 @@
 	--dock-bg: #1b1e20;
 	--card-bg: #000000;
 }
-/*TODO This is a copy of the dark theme, might want to look into other solutions*/
-.no-theme {
-	color-scheme: dark;
-	--primary-button-bg: color-mix(in srgb, #777777 10%, var(--accent-color));
-	--primary-bg: #303339;
-	--primary-hover: #272b31;
-	--primary-text: #dfdfdf;
-	--primary-text-soft: #adb8b9;
-	--secondary-bg: #16191b;
-	--secondary-hover: #252b2c;
-	--servers-bg: #191c1d;
-	--channels-bg: #2a2d33;
-	--channel-selected: #3c4046;
-	--typebox-bg: #3a3e45;
-	--button-bg: #4e5457;
-	--button-hover: #6b7174;
-	--spoiler-bg: #000000;
-	--link: #5ca9ed;
-	--primary-text-prominent: #efefef;
-	--dock-bg: #1b1e20;
-	--card-bg: #000000;
-}
 
 .WHITE-theme {
 	color-scheme: light;
@@ -73,7 +51,7 @@
 	--primary-button-bg: color-mix(in srgb, #000000 10%, var(--accent-color));
 	--primary-bg: #fefefe;
 	--primary-hover: #f6f6f9;
-	--primary-text: #4b4b59;
+	--primary-text: black;
 	--primary-text-soft: #656575;
 
 	--secondary-bg: #e0e0ea;
@@ -133,32 +111,55 @@
 	--secondary-text-soft: #211f2e;
 	--blank-bg: #494985;
 }
-
-.Dark-Accent-theme {
+.Dark-theme {
 	color-scheme: dark;
 	--primary-button-bg: color-mix(in srgb, #777777 10%, var(--accent-color));
-	--primary-bg: color-mix(in srgb, #3f3f3f 65%, var(--accent-color));
-	--primary-hover: color-mix(in srgb, #373737 68%, var(--accent-color));
-	--primary-text: #ebebeb;
-	--primary-text-soft: #ebebebb8;
-	--secondary-bg: color-mix(in srgb, #222222 72%, var(--accent-color));
-	--secondary-hover: color-mix(in srgb, #222222 65%, var(--accent-color));
-	--folder-bg: color-mix(in srgb, var(--primary-text-soft) 70%, var(--accent-color));
-	--servers-bg: color-mix(in srgb, #0b0b0b 70%, var(--accent-color));
-	--channels-bg: color-mix(in srgb, #292929 68%, var(--accent-color));
-	--channel-selected: color-mix(in srgb, #555555 65%, var(--accent-color));
-	--typebox-bg: color-mix(in srgb, #666666 60%, var(--accent-color));
-	--button-bg: color-mix(in srgb, #777777 56%, var(--accent-color));
-	--button-hover: color-mix(in srgb, #585858 58%, var(--accent-color));
-	--spoiler: color-mix(in srgb, #101010 72%, var(--accent-color));
-	--link: color-mix(in srgb, #99ccff 75%, var(--accent-color));
+	--primary-bg: #040404;
+	--primary-hover: #18181b;
+	--primary-text: #dfdfdf;
+	--primary-text-soft: #adb8b9;
+	--secondary-bg: #060608;
+	--secondary-hover: #18181b;
+	--servers-bg: #000000;
+	--channels-bg: #0a0a0a;
+	--channel-selected: #1f1f20;
+	--typebox-bg: #101112;
+	--button-bg: #19191a;
+	--button-hover: #1f1f20;
+	--spoiler-bg: #1f1f20;
+	--link: #326be5;
+	--primary-text-prominent: #efefef;
+	--dock-bg: #0a0b0c;
+	--card-bg: #000000;
+	--embed-bg: #000000;
+}
+.Dark-Accent-theme {
+	color-scheme: dark;
+	--primary-button-bg: color-mix(in srgb, #777777 20%, var(--accent-color));
+	--primary-bg: color-mix(in srgb, #040404 95%, var(--accent-color));
+	--primary-hover: color-mix(in srgb, #18181b 95%, var(--accent-color));
+	--primary-text: #dfdfdf;
+	--primary-text-soft: #adb8b9;
+	--secondary-bg: color-mix(in srgb, #060608 95%, var(--accent-color));
+	--secondary-hover: color-mix(in srgb, #18181b 95%, var(--accent-color));
+	--folder-bg: color-mix(in srgb, var(--primary-text-soft) 95%, var(--accent-color));
+	--servers-bg: color-mix(in srgb, #000000 95%, var(--accent-color));
+	--channels-bg: color-mix(in srgb, #0a0a0a 95%, var(--accent-color));
+	--channel-selected: color-mix(in srgb, #1f1f20 95%, var(--accent-color));
+	--typebox-bg: color-mix(in srgb, #101112 95%, var(--accent-color));
+	--button-bg: color-mix(in srgb, #19191a 95%, var(--accent-color));
+	--button-hover: color-mix(in srgb, #1f1f20 95%, var(--accent-color));
+	--spoiler: color-mix(in srgb, #101010 95%, var(--accent-color));
+	--link: #326be5;
 	--black: color-mix(in srgb, #000000 90%, var(--accent-color));
 	--icon: color-mix(in srgb, #ffffff, var(--accent-color));
-	--dock-bg: color-mix(in srgb, #171717 68%, var(--accent-color));
-	--spoiler-hover: color-mix(in srgb, #111111 80%, var(--accent-color));
-	--card-bg: color-mix(in srgb, #0b0b0b 70%, var(--accent-color));
-	--spoiler-bg: #000000;
-	--reaction-reacted-bg: color-mix(in srgb, var(--reaction-bg) 80%, white);
+	--dock-bg: color-mix(in srgb, #0a0b0c 95%, var(--accent-color));
+	--spoiler-hover: color-mix(in srgb, #111111 95%, var(--accent-color));
+	--card-bg: color-mix(in srgb, #000000 95%, var(--accent-color));
+	--spoiler-bg: #1f1f20;
+	--reaction-reacted-bg: color-mix(in srgb, var(--reaction-bg) 95%, white);
+	--primary-text-prominent: #efefef;
+	--embed-bg: #000000;
 }
 
 /* Optional Variables */

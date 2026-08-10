@@ -1083,8 +1083,9 @@ class Message extends SnowFlake {
 			if (this.attachments.length) {
 				const attach = document.createElement("div");
 				attach.classList.add("flexltr", "attachments");
+				const isGallery = this.attachments.length > 1;
 				for (const thing of this.attachments) {
-					attach.appendChild(thing.getHTML());
+					attach.appendChild(thing.getHTML(false, false, false, 96 * 3, isGallery));
 				}
 				messagedwrap.appendChild(attach);
 			}
@@ -1364,7 +1365,7 @@ class Message extends SnowFlake {
 						count.textContent = I18n.poll.count("" + c, per + "");
 						aarea.append(count);
 						if (per)
-							aarea.style.background = `linear-gradient(to right, var(--green) ${per}%, var(--bg) ${per}%)`;
+							aarea.style.background = `linear-gradient(to right, var(--accent-color) ${per}%, var(--bg) ${per}%)`;
 					}
 					aarea.onclick = () => check.click();
 					pollbody.append(aarea);

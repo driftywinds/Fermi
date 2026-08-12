@@ -350,7 +350,9 @@ class ReportNode {
 	gatherElements() {
 		const elms: Record<string, string[]> = {};
 		for (const thing of this.elements) {
-			if (thing.options?.length) elms[thing.json.name] = thing.options;
+			if (thing.options?.length) {
+				elms[thing.json.name] = thing.options;
+			}
 		}
 		return elms;
 	}
@@ -548,6 +550,27 @@ class ReportElement {
 				const dyn = map.dyn_preview;
 				if (!dyn) break;
 				div.append(dyn());
+				break;
+			}
+			case "free_text": {
+				if (json.data.title) {
+					const h2 = document.createElement("h2");
+					h2.textContent = json.data.title;
+					div.append(h2);
+				}
+				if (json.data.subtitle) {
+					const h5 = document.createElement("h5");
+					h5.textContent = json.data.subtitle;
+					div.append(h5);
+				}
+				const textarea = document.createElement("textarea");
+				if (json.data.placeholder) textarea.placeholder = json.data.placeholder;
+				textarea.rows = json.data.rows;
+				textarea.maxLength = json.data.character_limit;
+				div.append(textarea);
+				textarea.onchange = () => {
+					this.options[0] = textarea.value;
+				};
 				break;
 			}
 			default:

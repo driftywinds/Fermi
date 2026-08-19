@@ -961,6 +961,12 @@ class Message extends SnowFlake {
 				const userwrap = document.createElement("div");
 				userwrap.classList.add("userwrap");
 				userwrap.appendChild(username);
+				const pronouns = document.createElement("span");
+				pronouns.textContent = this.author.pronouns ?? "";
+				pronouns.classList.add("inlinepronouns");
+				//TODO make this a setting
+				if (this.author.pronouns) userwrap.append(pronouns);
+
 				if (this.author.bot) {
 					const username = document.createElement("span");
 					username.classList.add("bot");
@@ -1046,7 +1052,7 @@ class Message extends SnowFlake {
 				box.oncontextmenu = (e) => {
 					e.stopImmediatePropagation();
 				};
-				const [before, center, after] = I18n.editMode.editMsg("|||").split("|||");
+				const [before, center, after] = I18n.editMode.editMsg("|||", "???").split("|||");
 				const span = document.createElement("span");
 				const bs = document.createElement("span");
 				bs.textContent = before;
@@ -1058,9 +1064,29 @@ class Message extends SnowFlake {
 					this.generateMessage();
 				};
 
+				const makeEnter = (txt: string) => {
+					const [before, center, after] = txt.split("???");
+					const save = document.createElement("a");
+					save.textContent = center;
+					save.onclick = () => {
+						this.edit(MarkDown.gatherBoxText(area));
+						this.channel.editing = null;
+						this.generateMessage();
+					};
+					const bs = document.createElement("span");
+					bs.textContent = before;
+					const asp = document.createElement("span");
+					asp.textContent = after;
+					return [bs, save, asp];
+				};
+
 				const asp = document.createElement("span");
 				asp.textContent = after;
-				span.append(bs, exit, asp);
+				span.append(
+					...(before.includes("???") ? makeEnter(before) : [bs]),
+					exit,
+					...(after.includes("???") ? makeEnter(after) : [asp]),
+				);
 				box.append(span);
 			} else {
 				this.content.onUpdate = () => {};
@@ -1293,7 +1319,7 @@ class Message extends SnowFlake {
 		const stickerArea = document.createElement("div");
 		stickerArea.classList.add("flexltr", "stickerMArea");
 		for (const sticker of this.stickers) {
-			stickerArea.append(sticker.getHTML());
+			stickerArea.append(sticker.getHTML(false));
 		}
 		text.append(stickerArea);
 

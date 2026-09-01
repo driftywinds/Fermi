@@ -331,6 +331,7 @@ class User extends SnowFlake {
 				visible: function () {
 					return this.relationshipType !== 2 && this.id !== this.localuser.user.id;
 				},
+				color: "red",
 			},
 		);
 
@@ -1171,6 +1172,9 @@ class User extends SnowFlake {
 			}
 			case "domain": {
 				return `https://${con.external_id}`;
+			}
+			case "codeberg": {
+				return `https://codeberg.org/${con.name}`;
 			}
 		}
 	}

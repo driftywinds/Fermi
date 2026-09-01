@@ -1,0 +1,44 @@
+name: Build Fermi
+
+on:
+    push:
+        tags:
+            - "0.*"
+            - "1.*"
+
+jobs:
+  makeRelease:
+    name: makeRelease
+    runs-on: codeberg-tiny
+    steps:
+    - uses: actions/checkout@v4
+    - name: install node v22
+      uses: actions/setup-node@v1
+      with:
+        node-version: 22
+    - name: npm i
+      run: npm i
+    - name: npm run build
+      run: npm run build
+    - name: Write desc
+      id: desc
+      run: |
+        cat >> $FORGEJO_OUTPUT <<EOF
+        NOTES<<STRING
+        $(git tag --points-at HEAD -n99 --format="%(contents)")
+        STRING
+        EOF
+    - name: tar it
+      run: mkdir release; tar -czvf release/release.tar.gz dist/*
+    - name: zip it
+      run: zip release/release.zip -r dist/*
+    - uses: actions/forgejo-release@v2.13.4
+      with:
+        direction: upload
+        url: https://codeberg.org/
+        repo: MelodyChat/fermi
+        token: ${{ secrets.CODEBERG_TOKEN }}
+        tag: ${{ github.ref_name }}
+        release-dir: release/
+        release-notes: ${{ steps.desc.outputs.NOTES }}
+

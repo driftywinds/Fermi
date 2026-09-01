@@ -10,6 +10,7 @@ import {Emoji} from "./emoji.js";
 import {I18n} from "./i18n.js";
 import {Localuser} from "./localuser.js";
 import {MarkDown} from "./markdown.js";
+import {PromiseLock} from "./utils/promiseLock.js";
 
 interface OptionsElement<x> {
 	//
@@ -174,11 +175,12 @@ class TextInput implements OptionsElement<string> {
 	password: boolean;
 	spaceReplace: string;
 	name: string;
+	charLimit: number;
 	constructor(
 		label: string,
 		onSubmit: (str: string) => void,
 		owner: Options,
-		{initText = "", password = false, spaceReplace = " ", name = ""} = {},
+		{initText = "", password = false, spaceReplace = " ", name = "", charLimit = -1} = {},
 	) {
 		this.label = label;
 		this.value = initText;
@@ -187,6 +189,7 @@ class TextInput implements OptionsElement<string> {
 		this.password = password;
 		this.spaceReplace = spaceReplace;
 		this.name = name;
+		this.charLimit = charLimit;
 	}
 	generateHTML(): HTMLDivElement {
 		const div = document.createElement("div");
@@ -198,12 +201,27 @@ class TextInput implements OptionsElement<string> {
 		input.value = this.value;
 		input.type = this.password ? "password" : "text";
 		input.oninput = this.onChange.bind(this);
+		let hintText: undefined | HTMLElement;
 		input.onkeyup = () => {
 			let textValue = input.value;
 			textValue = textValue.replace(/ /g, this.spaceReplace);
 			input.value = textValue;
+			if (this.charLimit !== -1) {
+				const left = this.charLimit - textValue.length;
+				if (left / this.charLimit < 0.2) {
+					if (!hintText) {
+						hintText = document.createElement("span");
+						hintText.classList.add("hintTextInput");
+					}
+					div.append(hintText);
+					hintText.textContent = I18n.charLeft(left + "");
+				} else if (hintText) {
+					hintText.remove();
+				}
+			}
 		};
 		this.input = new WeakRef(input);
+		if (this.charLimit !== -1) input.maxLength = this.charLimit;
 		div.append(input);
 		return div;
 	}
@@ -774,16 +792,18 @@ class MDInput implements OptionsElement<string> {
 	readonly onSubmit: (str: string) => void;
 	value: string;
 	input!: WeakRef<HTMLTextAreaElement>;
+	charLimit: number;
 	constructor(
 		label: string,
 		onSubmit: (str: string) => void,
 		owner: Options,
-		{initText = ""} = {},
+		{initText = "", charLimit = -1} = {},
 	) {
 		this.label = label;
 		this.value = initText;
 		this.owner = owner;
 		this.onSubmit = onSubmit;
+		this.charLimit = charLimit;
 	}
 	generateHTML(): HTMLDivElement {
 		const div = document.createElement("div");
@@ -793,7 +813,24 @@ class MDInput implements OptionsElement<string> {
 		div.append(document.createElement("br"));
 		const input = document.createElement("textarea");
 		input.value = this.value;
-		input.oninput = this.onChange.bind(this);
+		let hintText: undefined | HTMLElement;
+		input.oninput = () => {
+			this.onChange();
+			if (this.charLimit !== -1) {
+				const left = this.charLimit - this.value.length;
+				if (left / this.charLimit < 0.2) {
+					if (!hintText) {
+						hintText = document.createElement("span");
+						hintText.classList.add("hintTextInput");
+					}
+					div.append(hintText);
+					hintText.textContent = I18n.charLeft(left + "");
+				} else if (hintText) {
+					hintText.remove();
+				}
+			}
+		};
+		if (this.charLimit !== -1) input.maxLength = this.charLimit;
 		this.input = new WeakRef(input);
 		div.append(input);
 		return div;
@@ -1565,13 +1602,14 @@ class Options implements OptionsElement<void> {
 	addTextInput(
 		label: string,
 		onSubmit: (str: string) => void,
-		{initText = "", password = false, spaceReplace = " ", name = ""} = {},
+		{initText = "", password = false, spaceReplace = " ", name = "", charLimit = -1} = {},
 	) {
 		const textInput = new TextInput(label, onSubmit, this, {
 			initText,
 			password,
 			spaceReplace,
 			name,
+			charLimit,
 		});
 		this.options.push(textInput);
 		this.generate(textInput);
@@ -1583,8 +1621,8 @@ class Options implements OptionsElement<void> {
 		this.generate(colorInput);
 		return colorInput;
 	}
-	addMDInput(label: string, onSubmit: (str: string) => void, {initText = ""} = {}) {
-		const mdInput = new MDInput(label, onSubmit, this, {initText});
+	addMDInput(label: string, onSubmit: (str: string) => void, {initText = "", charLimit = -1} = {}) {
+		const mdInput = new MDInput(label, onSubmit, this, {initText, charLimit});
 		this.options.push(mdInput);
 		this.generate(mdInput);
 		return mdInput;
@@ -2313,161 +2351,165 @@ class Form implements OptionsElement<object> {
 		this.preprocessor = func;
 	}
 	onFormError = (_: FormError) => {};
-	subbmitting = false;
+	submitLock = new PromiseLock();
 	async submit() {
+		if (this.submitLock.locked) return;
+		const lock = await this.submitLock.acquireLock();
+		try {
+			this.submitInt();
+		} finally {
+			lock();
+		}
+	}
+	private async submitInt() {
 		if (this.options.subOptions) {
 			this.options.subOptions.submit();
 			return;
 		}
-		if (this.subbmitting) return;
-		this.subbmitting = true;
-		try {
-			console.log("start");
-			const build = {};
-			for (const key of Object.keys(this.values)) {
-				const thing = this.values[key];
-				if (thing instanceof Function) {
-					try {
-						(build as any)[key] = thing();
-					} catch (e: any) {
-						if (e instanceof FormError) {
-							this.handleError(e);
-						}
-						return;
+
+		console.log("start");
+		const build = {};
+		for (const key of Object.keys(this.values)) {
+			const thing = this.values[key];
+			if (thing instanceof Function) {
+				try {
+					(build as any)[key] = thing();
+				} catch (e: any) {
+					if (e instanceof FormError) {
+						this.handleError(e);
+					}
+					return;
+				}
+			} else {
+				(build as any)[key] = thing;
+			}
+		}
+		console.log("middle");
+		const promises: Promise<void>[] = [];
+		for (const thing of this.names.keys()) {
+			if (thing === "") continue;
+			const input = this.names.get(thing) as OptionsElement<any>;
+			if (input instanceof SelectInput) {
+				(build as any)[thing] = (this.selectMap.get(input) as string[])[input.value];
+				continue;
+			} else if (input instanceof FileInput) {
+				const options = this.fileOptions.get(input);
+				if (!options) {
+					throw new Error(
+						"FileInput without its options is in this form, this should never happen.",
+					);
+				}
+				if (options.files === "one") {
+					console.log(input.value);
+					if (input.value) {
+						const reader = new FileReader();
+						const promise = new Promise<void>((res) => {
+							reader.onload = () => {
+								(build as any)[thing] = reader.result;
+								res();
+							};
+						});
+						reader.readAsDataURL(input.value[0]);
+						promises.push(promise);
+						continue;
 					}
 				} else {
-					(build as any)[key] = thing;
+					console.error(options.files + " is not currently implemented");
 				}
+			} else if (input instanceof EmojiInput) {
+				if (!input.value) {
+					(build as any)[thing] = input.value;
+				} else if (input.value.id) {
+					(build as any)[thing] = input.value.id;
+				} else if (input.value.emoji) {
+					(build as any)[thing] = input.value.emoji;
+				}
+				continue;
 			}
-			console.log("middle");
-			const promises: Promise<void>[] = [];
-			for (const thing of this.names.keys()) {
-				if (thing === "") continue;
-				const input = this.names.get(thing) as OptionsElement<any>;
-				if (input instanceof SelectInput) {
-					(build as any)[thing] = (this.selectMap.get(input) as string[])[input.value];
-					continue;
-				} else if (input instanceof FileInput) {
-					const options = this.fileOptions.get(input);
-					if (!options) {
-						throw new Error(
-							"FileInput without its options is in this form, this should never happen.",
-						);
+			(build as any)[thing] = input.value;
+		}
+		console.log("middle2");
+		await Promise.allSettled(promises);
+		try {
+			this.preprocessor(build);
+		} catch (e) {
+			if (e instanceof FormError) {
+				this.handleError(e);
+			}
+			return;
+		}
+		if (this.fetchURL !== "") {
+			const onSubmit = async (json: any) => {
+				try {
+					await this.onSubmit(json, build);
+				} catch (e) {
+					console.error(e);
+					if (e instanceof FormError) {
+						this.handleError(e);
 					}
-					if (options.files === "one") {
-						console.log(input.value);
-						if (input.value) {
-							const reader = new FileReader();
-							const promise = new Promise<void>((res) => {
-								reader.onload = () => {
-									(build as any)[thing] = reader.result;
-									res();
-								};
-							});
-							reader.readAsDataURL(input.value[0]);
-							promises.push(promise);
-							continue;
+					return;
+				}
+			};
+			const doFetch = async () => {
+				fetch(this.fetchURL, {
+					method: this.method,
+					body: JSON.stringify(build),
+					headers: this.headers,
+				})
+					.then(async (_) => {
+						return [await _.text(), _.status] as const;
+					})
+					.then(([_, status]) => {
+						if (_ === "") return [null, status];
+						return [JSON.parse(_), status] as const;
+					})
+					.then(async ([json, status]) => {
+						if (await handleCaptcha(json, build, this.captcha)) {
+							return await doFetch();
 						}
-					} else {
-						console.error(options.files + " is not currently implemented");
-					}
-				} else if (input instanceof EmojiInput) {
-					if (!input.value) {
-						(build as any)[thing] = input.value;
-					} else if (input.value.id) {
-						(build as any)[thing] = input.value.id;
-					} else if (input.value.emoji) {
-						(build as any)[thing] = input.value.emoji;
-					}
-					continue;
-				}
-				(build as any)[thing] = input.value;
-			}
-			console.log("middle2");
-			await Promise.allSettled(promises);
+						const match = this.fetchURL.match(/https?:\/\/[^\/]*\/api/gm);
+						if (match && this.tfaCheck) {
+							const tried = await handle2fa(json, match[0]);
+							if (tried) {
+								return await onSubmit(tried);
+							}
+						}
+						if (json.ticket) {
+						}
+						if (json.errors) {
+							if (this.errors(json)) {
+								return;
+							}
+						} else if (status === 500) {
+							this.error(
+								[...this.names].at(-1)?.[0] ?? "",
+								json.message ?? "internal server error",
+							);
+							return;
+						}
+						if (
+							Math.floor(json.code / 100) === 4 &&
+							json.message &&
+							typeof json.message === "string"
+						) {
+							this.showPrimError(json.message);
+							return;
+						}
+						onSubmit(json);
+					});
+			};
+			await doFetch();
+		} else {
 			try {
-				this.preprocessor(build);
+				await this.onSubmit(build, build);
 			} catch (e) {
 				if (e instanceof FormError) {
 					this.handleError(e);
 				}
 				return;
 			}
-			if (this.fetchURL !== "") {
-				const onSubmit = async (json: any) => {
-					try {
-						await this.onSubmit(json, build);
-					} catch (e) {
-						console.error(e);
-						if (e instanceof FormError) {
-							this.handleError(e);
-						}
-						return;
-					}
-				};
-				const doFetch = async () => {
-					fetch(this.fetchURL, {
-						method: this.method,
-						body: JSON.stringify(build),
-						headers: this.headers,
-					})
-						.then(async (_) => {
-							return [await _.text(), _.status] as const;
-						})
-						.then(([_, status]) => {
-							if (_ === "") return [null, status];
-							return [JSON.parse(_), status] as const;
-						})
-						.then(async ([json, status]) => {
-							if (await handleCaptcha(json, build, this.captcha)) {
-								return await doFetch();
-							}
-							const match = this.fetchURL.match(/https?:\/\/[^\/]*\/api/gm);
-							if (match && this.tfaCheck) {
-								const tried = await handle2fa(json, match[0]);
-								if (tried) {
-									return await onSubmit(tried);
-								}
-							}
-							if (json.ticket) {
-							}
-							if (json.errors) {
-								if (this.errors(json)) {
-									return;
-								}
-							} else if (status === 500) {
-								this.error(
-									[...this.names].at(-1)?.[0] ?? "",
-									json.message ?? "internal server error",
-								);
-								return;
-							}
-							if (
-								Math.floor(json.code / 100) === 4 &&
-								json.message &&
-								typeof json.message === "string"
-							) {
-								this.showPrimError(json.message);
-								return;
-							}
-							onSubmit(json);
-						});
-				};
-				doFetch();
-			} else {
-				try {
-					await this.onSubmit(build, build);
-				} catch (e) {
-					if (e instanceof FormError) {
-						this.handleError(e);
-					}
-					return;
-				}
-			}
-			console.warn("needs to be implemented");
-		} finally {
-			this.subbmitting = false;
 		}
+		console.warn("needs to be implemented");
 	}
 	showPrimError(error: string) {
 		const pop = new PopUp(error, {goAbove: true, buttons: popUpButtonTypes.dismiss});

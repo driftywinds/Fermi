@@ -40,6 +40,7 @@ import {AccountSwitcher} from "./utils/switcher.js";
 import {Favorites} from "./favorites.js";
 import {
 	AnimateTristateValues,
+	ClockFormatOverrideValues,
 	getPreferences,
 	setPreferences,
 	ThemeOption,
@@ -54,6 +55,9 @@ import {Versions} from "./versions.js";
 import {Shortcut} from "./shortcuts/shortcut.js";
 import {getShortcuts, setShortcuts} from "./utils/storage/shortcuts.js";
 import {TypeBox} from "./typeBox.js";
+import {InstnaceConfig} from "./instanceConfig.js";
+import {FS} from "./fs/index.js";
+import {decode64} from "./utils/base64.js";
 type traceObj = {
 	micros: number;
 	calls?: (string | traceObj)[];
@@ -95,6 +99,7 @@ class Localuser {
 	readonly idToPrev = new Map<string, string | undefined>();
 	readonly idToNext = new Map<string, string | undefined>();
 	static readonly globalShortcuts = new Shortcut();
+	fs = new FS();
 	get status() {
 		return this.user.status;
 	}
@@ -273,6 +278,7 @@ class Localuser {
 	}
 	onswap?: (l: Localuser) => void;
 	constructor(userinfo: Specialuser) {
+		this.conf = new InstnaceConfig(userinfo.serverurls.api);
 		Play.playURL("/audio/sounds.jasf").then((_) => {
 			this.play = _;
 		});
@@ -372,9 +378,12 @@ class Localuser {
 	}
 	guildFolders: guildFolder[] = [];
 	readonly unknownRead = new Map<string, readStateEntry>();
+	conf: InstnaceConfig;
 	async gottenReady(ready: readyjson): Promise<void> {
+		this.conf = new InstnaceConfig(this.info.api);
 		this.getGifProvidors();
 		await I18n.done;
+		await this.conf.ready;
 		this.errorBackoff = 0;
 		this.queryBlog();
 		this.guildFolders = ready.d.user_settings.guild_folders;
@@ -2712,7 +2721,7 @@ class Localuser {
 						});
 					}
 				},
-				{initText: this.user.pronouns},
+				{initText: this.user.pronouns, charLimit: this.conf.maxPronouns},
 			);
 			pronounbox.watchForChange((_) => {
 				hypouser.pronouns = _;
@@ -2721,6 +2730,7 @@ class Localuser {
 			});
 			const bioBox = settingsLeft.addMDInput(I18n.bio(), (_) => {}, {
 				initText: this.user.bio.rawString,
+				charLimit: this.conf.maxBio,
 			});
 			bioBox.watchForChange((_) => {
 				newbio = _;
@@ -3068,19 +3078,17 @@ class Localuser {
 								const file = input.files[0];
 
 								let reader = new FileReader();
-								reader.onload = () => {
-									let dataUrl = reader.result;
-									if (typeof dataUrl !== "string") return;
-									this.perminfo.sound = {};
-									try {
-										this.perminfo.sound.cSound = dataUrl;
-										console.log(this.perminfo.sound.cSound);
-										this.playSound("custom");
-									} catch (_) {
-										alert(I18n.localuser.soundTooLarge());
+								reader.onload = async () => {
+									let buffer = reader.result;
+									if (!(buffer instanceof ArrayBuffer)) return;
+									const sound = await this.fs.getFile("/customSound", true);
+									if (!sound) {
+										return;
 									}
+									sound.write(buffer);
+									this.playSound("custom");
 								};
-								reader.readAsDataURL(file);
+								reader.readAsArrayBuffer(file);
 							}
 						});
 						area.append(input);
@@ -3180,6 +3188,19 @@ class Localuser {
 					},
 					{
 						initState: prefs.showToday,
+					},
+				);
+			}
+			{
+				tas.addSelect(
+					I18n.localuser.clockFormatOverride(),
+					async (_) => {
+						prefs.clockFormatOverride = ClockFormatOverrideValues[_];
+						setPreferences(prefs);
+					},
+					ClockFormatOverrideValues.map((_) => I18n.localuser.clockFormatOverrideValues[_]()),
+					{
+						defaultIndex: ClockFormatOverrideValues.indexOf(prefs.clockFormatOverride),
 					},
 				);
 			}
@@ -4443,7 +4464,9 @@ class Localuser {
 
 				gifs.append(div);
 
-				div.onclick = () => {
+				div.onmousedown = (e) => {
+					e.preventDefault();
+					e.stopImmediatePropagation();
 					if (this.focusChannel) {
 						this.focusChannel.sendMessage(gif.src, {
 							embeds: [],
@@ -5580,16 +5603,28 @@ class Localuser {
 		userinfos.preferences.notisound = sound;
 		localStorage.setItem("userinfos", JSON.stringify(userinfos));
 	}
-	playSound(name = this.getNotificationSound()) {
+	async playSound(name = this.getNotificationSound()) {
 		const volume = this.getNotiVolume();
 		if (this.play) {
 			const voice = this.play.tracks.includes(name);
 			if (voice) {
 				this.play.play(name, volume);
-			} else if (this.perminfo.sound && this.perminfo.sound.cSound) {
+			} else {
 				const audio = document.createElement("audio");
+				let sound = await this.fs.getFile("/customSound", false);
+				if (this.perminfo.sound?.cSound) {
+					const s = this.perminfo.sound.cSound as string;
+					if (!s) return;
+					const byteString = s.split(",")[1];
+
+					sound = await this.fs.getFile("/customSound", true);
+					if (!sound) return;
+					await sound.write(decode64(byteString));
+					delete this.perminfo.sound;
+				}
+				if (!sound) return;
 				audio.volume = volume / 100;
-				audio.src = this.perminfo.sound.cSound;
+				audio.src = await sound.getURL();
 				audio.play().catch();
 			}
 		} else {

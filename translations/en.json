@@ -318,7 +318,7 @@
 	},
 	"goThere": "Yes, let's go",
 	"goThereTrust": "Yes & trust this domain from now on",
-	"goingToURL": "This hyperlink will send you to $1. Are you sure you want to go there?",
+	"goingToURL": "This hyperlink will send you to $1 in a new tab. Are you sure you want to go there?",
 	"group": {
 		"createdm": "Create DM!",
 		"edit": "Edit group chat",
@@ -976,7 +976,10 @@
 		"display": "Display on profile: ",
 		"delete": "Delete Connection",
 		"sure": "Are you sure?",
-		"sureDesc": "If you remove this connection, you can't undo it"
+		"sureDesc": "If you remove this connection, you can't undo it",
+		"handle": "Handle:",
+		"mastodon": "Enter Mastodon account info",
+		"mastodonSub": "-# This is compatible with non-mastodon services like wafrn"
 	},
 	"unpinMessage": "Unpin message",
 	"updateAv": "Updates available",

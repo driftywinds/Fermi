@@ -5,6 +5,7 @@ import {
 	instancefetch,
 	InstanceInfo,
 	removeAni,
+	saveFile,
 } from "./utils/utils.js";
 import {Emoji} from "./emoji.js";
 import {I18n} from "./i18n.js";
@@ -176,16 +177,25 @@ class TextInput implements OptionsElement<string> {
 	spaceReplace: string;
 	name: string;
 	charLimit: number;
+	onEnter?: () => void;
 	constructor(
 		label: string,
 		onSubmit: (str: string) => void,
 		owner: Options,
-		{initText = "", password = false, spaceReplace = " ", name = "", charLimit = -1} = {},
+		{
+			initText = "",
+			password = false,
+			spaceReplace = " ",
+			name = "",
+			charLimit = -1,
+			onEnter = undefined as (() => void) | undefined,
+		} = {},
 	) {
 		this.label = label;
 		this.value = initText;
 		this.owner = owner;
 		this.onSubmit = onSubmit;
+		this.onEnter = onEnter;
 		this.password = password;
 		this.spaceReplace = spaceReplace;
 		this.name = name;
@@ -202,7 +212,7 @@ class TextInput implements OptionsElement<string> {
 		input.type = this.password ? "password" : "text";
 		input.oninput = this.onChange.bind(this);
 		let hintText: undefined | HTMLElement;
-		input.onkeyup = () => {
+		input.onkeyup = (e) => {
 			let textValue = input.value;
 			textValue = textValue.replace(/ /g, this.spaceReplace);
 			input.value = textValue;
@@ -218,6 +228,9 @@ class TextInput implements OptionsElement<string> {
 				} else if (hintText) {
 					hintText.remove();
 				}
+			}
+			if (e.key === "Enter") {
+				this.onEnter?.();
 			}
 		};
 		this.input = new WeakRef(input);
@@ -1602,7 +1615,14 @@ class Options implements OptionsElement<void> {
 	addTextInput(
 		label: string,
 		onSubmit: (str: string) => void,
-		{initText = "", password = false, spaceReplace = " ", name = "", charLimit = -1} = {},
+		{
+			initText = "",
+			password = false,
+			spaceReplace = " ",
+			name = "",
+			charLimit = -1,
+			onEnter = undefined as undefined | (() => void),
+		} = {},
 	) {
 		const textInput = new TextInput(label, onSubmit, this, {
 			initText,
@@ -1610,6 +1630,7 @@ class Options implements OptionsElement<void> {
 			spaceReplace,
 			name,
 			charLimit,
+			onEnter,
 		});
 		this.options.push(textInput);
 		this.generate(textInput);
@@ -1965,51 +1986,58 @@ class FormError extends Error {
 }
 async function handle2fa(json: any, api: string): Promise<false | any> {
 	if (json.ticket) {
-		if (json.webauthn) {
-			const challenge = JSON.parse(json.webauthn)
-				.publicKey as PublicKeyCredentialRequestOptionsJSON;
-			challenge.challenge = challenge.challenge
-				.split("=")[0]
-				.replaceAll("+", "-")
-				.replaceAll("/", "_");
-			challenge.allowCredentials?.forEach(
-				(_) => (_.id = _.id.split("=")[0].replaceAll("+", "-").replaceAll("/", "_")),
-			);
-			console.log(challenge);
-			const options = PublicKeyCredential.parseRequestOptionsFromJSON(challenge);
-			const credential = (await navigator.credentials.get({publicKey: options})) as unknown as {
-				rawId: ArrayBuffer;
-				response: {
-					[key: string]: ArrayBuffer;
-				};
-			};
-			if (!credential) return false;
-			function toBase64(buf: ArrayBuffer) {
-				return btoa(String.fromCharCode(...new Uint8Array(buf)));
+		return new Promise<boolean>(async (resolution) => {
+			const better = new Dialog("");
+			better.onhide = () => resolution(false);
+			const buttons = better.options.addButtons("", {top: true, titles: false});
+			if (json.webauthn) {
+				const opt = buttons.add(I18n.mfa.webauthn());
+				opt.addButtonInput("", "Passkey", async (): Promise<void> => {
+					const challenge = JSON.parse(json.webauthn)
+						.publicKey as PublicKeyCredentialRequestOptionsJSON;
+					challenge.challenge = challenge.challenge
+						.split("=")[0]
+						.replaceAll("+", "-")
+						.replaceAll("/", "_");
+					challenge.allowCredentials?.forEach(
+						(_) => (_.id = _.id.split("=")[0].replaceAll("+", "-").replaceAll("/", "_")),
+					);
+					console.log(challenge);
+					const options = PublicKeyCredential.parseRequestOptionsFromJSON(challenge);
+					const credential = (await navigator.credentials.get({publicKey: options})) as unknown as {
+						rawId: ArrayBuffer;
+						response: {
+							[key: string]: ArrayBuffer;
+						};
+					};
+					if (!credential) resolution(false);
+					function toBase64(buf: ArrayBuffer) {
+						return btoa(String.fromCharCode(...new Uint8Array(buf)));
+					}
+					const keys = ["authenticatorData", "clientDataJSON", "signature"];
+					const response = {} as any;
+					for (const key of keys) {
+						response[key] = toBase64(credential.response[key] as ArrayBuffer);
+					}
+					const res = {
+						rawId: toBase64(credential.rawId),
+						response,
+					};
+					const resObj = await fetch(api + "/auth/mfa/webauthn", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify({code: JSON.stringify(res), ticket: json.ticket}),
+					});
+					if (!resObj.ok) resolution(false);
+					const jsonRes = await resObj.json();
+					resolution(jsonRes);
+				});
 			}
-			const keys = ["authenticatorData", "clientDataJSON", "signature"];
-			const response = {} as any;
-			for (const key of keys) {
-				response[key] = toBase64(credential.response[key] as ArrayBuffer);
-			}
-			const res = {
-				rawId: toBase64(credential.rawId),
-				response,
-			};
-			const resObj = await fetch(api + "/auth/mfa/webauthn", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({code: JSON.stringify(res), ticket: json.ticket}),
-			});
-			if (!resObj.ok) return false;
-			const jsonRes = await resObj.json();
-			return jsonRes;
-		} else {
-			return new Promise<boolean>((resolution) => {
-				const better = new Dialog("");
-				const form = better.options.addForm(
+			if (json.mfa) {
+				const opt = buttons.add(I18n.mfa.totp());
+				const form = opt.addForm(
 					"",
 					(res: any) => {
 						if (res.message) {
@@ -2028,14 +2056,95 @@ async function handle2fa(json: any, api: string): Promise<false | any> {
 					},
 				);
 				form.addTitle(I18n["2faCode"]());
-				form.addPreprocessor((e) => {
-					//@ts-ignore
-					e.ticket = json.ticket;
-				});
+				form.setValue("ticket", json.ticket);
 				const ti = form.addTextInput("", "code");
-				better.show().parentElement!.style.zIndex = "200";
-			});
-		}
+			}
+			{
+				const opt = buttons.add(I18n.mfa.backup());
+				const form = opt.addForm(
+					"",
+					(res: any) => {
+						if (res.message) {
+							throw new FormError(ti, res.message);
+						} else {
+							resolution(res);
+							better.hide();
+						}
+					},
+					{
+						fetchURL: api + "/auth/mfa/totp",
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+						},
+					},
+				);
+				form.setValue("ticket", json.ticket);
+
+				form.addButtonInput("", I18n.mfa.giveBackupFile(), async () => {
+					let handle: FileSystemFileHandle | undefined = undefined;
+					let jsonfile: string;
+					let name: string = "backup.codes";
+					if ("showOpenFilePicker" in window) {
+						const pick = window.showOpenFilePicker as () => Promise<FileSystemFileHandle[]>;
+						[handle] = await pick();
+						const f = await handle.getFile();
+						name = f.name;
+						jsonfile = await f.text();
+					} else {
+						const input = document.createElement("input");
+						input.type = "file";
+						input.multiple = true;
+						input.click();
+						jsonfile = await new Promise<string>(
+							(res) =>
+								(input.onchange = () => {
+									if (input.files) {
+										name = input.files[0].name;
+										input.files[0].text().then(res);
+									}
+								}),
+						);
+					}
+					const j = JSON.parse(jsonfile) as {
+						user_id: string;
+						code: string;
+						consumed: boolean;
+					}[];
+					let resolve: any;
+					for (const item of j) {
+						if (item.consumed) continue;
+						const res = await fetch(api + "/auth/mfa/totp", {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+							},
+							body: JSON.stringify({code: item.code, ticket: json.ticket}),
+						});
+						item.consumed = true;
+						resolve = await res.json();
+						if (res.ok) break;
+					}
+					if (resolve)
+						if (handle) {
+							const w = await handle.createWritable();
+							await w.write(JSON.stringify(j));
+							await w.close();
+						} else {
+							await saveFile(new TextEncoder().encode(JSON.stringify(j)).buffer, name);
+						}
+					if (resolve) {
+						alert(I18n.mfa.backupWorked(j.reduce((c, p) => (p.consumed ? c : c + 1), 0) + ""));
+						resolution(resolve);
+					} else {
+						alert(I18n.mfa.backupFailed());
+					}
+				});
+				form.addTitle(I18n.mfa.backupIn());
+				const ti = form.addTextInput("", "code");
+			}
+			better.show().parentElement!.style.zIndex = "200";
+		});
 	} else {
 		return false;
 	}
@@ -2246,6 +2355,7 @@ class Form implements OptionsElement<object> {
 			password,
 			spaceReplace,
 			name,
+			onEnter: this.traditionalSubmit ? undefined : () => this.submit(),
 		});
 		this.names.set(formName, textInput);
 		if (required) {
@@ -2353,7 +2463,7 @@ class Form implements OptionsElement<object> {
 		}
 	}
 	preprocessor: (obj: Object) => void = () => {};
-	addPreprocessor(func: (obj: Object) => void) {
+	addPreprocessor(func: (obj: object) => void) {
 		this.preprocessor = func;
 	}
 	onFormError = (_: FormError) => {};

@@ -15,7 +15,7 @@ import {
 	setPreferences,
 	ThemeOption,
 } from "./utils/storage/userPreferences";
-import {createImg, getapiurls, installPGet, setTheme, SW} from "./utils/utils";
+import {createImg, getapiurls, installPGet, saveFile, setTheme, SW} from "./utils/utils";
 
 export async function showusersettings(localuser: Localuser) {
 	const prefs = getPreferences();
@@ -819,7 +819,7 @@ export async function showusersettings(localuser: Localuser) {
 							headers: localuser.headers,
 						},
 					);
-					form.addTextInput(I18n.localuser["2faCode:"](), "code", {required: true});
+					form.addTextInput(I18n.localuser.reset2FACode(), "code", {required: true});
 				});
 			} else {
 				twofa.addSubButtonInput(I18n.localuser["2faEnable"](), async (sub) => {
@@ -840,8 +840,14 @@ export async function showusersettings(localuser: Localuser) {
 										break;
 								}
 							} else {
-								gen2FA();
+								const codes = _.backup_codes as {
+									user_id: string;
+									code: string;
+									consumed: boolean;
+								}[];
+								saveFile(new TextEncoder().encode(JSON.stringify(codes)).buffer, "codes.backup");
 								localuser.mfa_enabled = true;
+								gen2FA();
 								twofa.returnFromSub();
 							}
 						},
@@ -863,15 +869,15 @@ export async function showusersettings(localuser: Localuser) {
 			{
 				twofa.addSubButtonInput(I18n.webauth.manage(), (keyMenu) => {
 					const addKey = (key: {name: string; id: string}) => {
-						keyMenu.addButtonInput("", key.name, () => {
+						const b = keyMenu.addButtonInput("", key.name, () => {
 							const opt = keyMenu.addSubOptions(key.name);
-							const button = opt.addButtonInput("", I18n.delete(), async () => {
+							opt.addButtonInput("", I18n.delete(), async () => {
 								await fetch(localuser.info.api + "/users/@me/mfa/webauthn/credentials/" + key.id, {
 									headers: localuser.headers,
 									method: "DELETE",
 								});
+								keyMenu.deleteElm(b);
 								keyMenu.returnFromSub();
-								keyMenu.deleteElm(button);
 							});
 						});
 					};

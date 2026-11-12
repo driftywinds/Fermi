@@ -303,7 +303,8 @@
 		"color": "Folder color:",
 		"create": "Create new folder",
 		"edit": "Edit folder",
-		"name": "Folder name:"
+		"name": "Folder name:",
+		"delete": "Delete folder"
 	},
 	"form": {
 		"captcha": "Wait, are you a human?"
@@ -1089,7 +1090,8 @@
 		"shortcuts": "Shortcuts",
 		"empty": "<No keybind set>",
 		"descs": {
-			"gifSearch": "Search GIFs:"
+			"gifSearch": "Search GIFs:",
+			"search": "Search:"
 		}
 	},
 	"domain": {
